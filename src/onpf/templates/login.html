@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Welcome · ONPF{% endblock %}
+{% block body_class %}landing-page{% endblock %}
+{% block main_class %}landing-content{% endblock %}
+{% block content %}
+<section class="mosaic-hero" aria-labelledby="about-onpf">
+<p class="eyebrow">Open-Source Non-Profit Project Framework</p>
+<h1 id="about-onpf">Small ideas.<br>Room to grow.</h1>
+<p class="lead">A self-hosted workspace for designing community programs. Gather contributions, develop proposals, record owner decisions, and share reusable documents.</p>
+<a class="button" href="{{ url_for('publications.garden_tour') }}">Step into your workspace ↗</a>
+</section>
+<section class="mosaic-grid" aria-label="About ONPF">
+<article class="mosaic-tile tile-listen"><p class="eyebrow">01 / Bring ideas together</p><div class="mosaic-orb" aria-hidden="true"></div><div><h2>Every perspective<br>has a place.</h2><p>Collect input online, on paper, or in meetings. Preserve contributions and their corrections.</p></div></article>
+<article class="mosaic-tile tile-develop"><p class="eyebrow">02 / Shape a program</p><h2>Turn the conversation into a plan.</h2><p>Refine proposals, record owner decisions, and approve the exact version you want to release.</p></article>
+<article class="mosaic-tile tile-share"><p class="eyebrow">03 / Make it reusable</p><h2>Share.<br>Adapt. Repeat.</h2><p>Editable ODT, Markdown and CSV exports, plus public packages for local adaptation.</p></article>
+<article class="mosaic-tile tile-local"><p class="eyebrow">Your installation</p><h2>A workspace<br>you run.</h2><p>No AI account, cloud service, or Codex installation required. Your administrator manages accounts and access.</p></article>
+</section>
+<section id="sign-in" class="signin-panel" aria-labelledby="signin-title">
+<div><p class="eyebrow">Your next step</p><h2 id="signin-title">Welcome to<br>your workspace.</h2><p>Use the account created by your installation administrator.</p></div>
+<div>{% if error %}<p class="error" role="alert">{{ error.message }}</p>{% endif %}
+<form method="post" action="{{ url_for('auth.login', next=request.args.get('next', '')) }}#sign-in" class="stack">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label for="username">Username</label>
+  <input id="username" name="username" value="{{ username }}" maxlength="100" autocomplete="username" required>
+  <label for="password">Password</label>
+  <input id="password" name="password" type="password" maxlength="1024" autocomplete="current-password" required>
+  <button type="submit">Sign in</button>
+</form>
+</div></section>
+{% endblock %}

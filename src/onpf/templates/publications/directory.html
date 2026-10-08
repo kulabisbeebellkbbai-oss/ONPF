@@ -1,0 +1,7 @@
+{% extends 'base.html' %}
+{% block title %}Public project library · ONPF{% endblock %}
+{% block content %}
+<h1>Public project library</h1>
+<p>These project versions were explicitly published by their owners. Their design approval and recorded operating status are shown separately. Review local permissions before reuse.</p>
+<ul class="program-list">{% for source in projects %}<li><a href="{{ url_for('publications.detail', program_id=source.program_id, version_number=source.publication_version) }}">{{ source.title }}</a><p>Version {{ source.publication_version }} · {{ source.approval_status }} design · operating status {{ source.operating_status.replace('_',' ') }} · {{ source.published_at }}</p></li>{% else %}<li>No projects have been published yet.</li>{% endfor %}</ul>
+{% endblock %}

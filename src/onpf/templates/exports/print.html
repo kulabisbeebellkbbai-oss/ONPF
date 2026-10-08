@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "exports/_budget.html" import budget_rows %}
+{% block title %}{{ source.title }} · Public print view · ONPF{% endblock %}
+{% block content %}
+<style>
+@page { size: Letter; margin: .55in; }
+.writing-line { min-height: 2.5rem; border-bottom: 1px solid #aaa; }
+.public-document { margin-top: 2rem; }
+@media print { .public-document { break-before: auto; break-inside: auto; } .public-document p { margin-bottom: .6rem; widows: 2; orphans: 2; } .public-document h3 { margin: .7rem 0 .3rem; } h2,h3 { break-after: avoid; } .writing-line { break-inside: avoid; } tr { break-inside: avoid; } .public-budget thead { display: table-header-group; } }
+</style>
+<p class="no-print"><a href="{{ url_for('releases.detail', release_id=source.provenance.release_id) }}">Release</a> · For a clean PDF, print on Letter at 100% scale and turn off the browser's Headers and footers option.</p>
+<h1>{{ source.title }}</h1>
+<p>Release {{ source.provenance.release_number }} · framework {{ source.framework_version }}</p>
+<p>Permission to operate: <strong>{{ source.operating_status.replace('_', ' ') }}</strong>. Design approval does not grant operating permission.</p>
+<h2>Purpose</h2><p class="preserved">{{ source.purpose }}</p><h2>Local context</h2><p class="preserved">{{ source.local_context }}</p>
+{% for key,document in source.documents.items() %}<section class="public-document"><h2>{{ document.title }}</h2>
+{% for section in document.sections %}<h3>{{ section.label }}</h3>{% if section.text.strip() %}<p class="preserved">{{ section.text }}</p>{% else %}<p>Unresolved local requirement. Complete locally before use.</p>{% for line in range(3) %}<div class="writing-line"></div>{% endfor %}{% endif %}{% endfor %}
+{% if document.rows is defined %}{{ budget_rows(document.rows) }}{% endif %}
+</section>{% endfor %}
+<section class="public-document"><h2>{{ blank.title }}</h2>{% for section in blank.sections %}<h3>{{ section.label }}</h3>{% for line in range(3) %}<div class="writing-line"></div>{% endfor %}{% endfor %}</section>
+<section class="public-document"><h2>Material versions and notices</h2><p>Project-owned content uses MIT No Attribution (MIT-0). Commercial use and proprietary adaptations are permitted; improvements are encouraged, not required. Selected third-party material retains its own terms.</p>
+{% for material in source.materials %}<h3>{{ material.title }} · version {{ material.version_number }}</h3><p class="preserved">{{ material.license }}
+{{ material.permission_basis }}
+{{ material.notices }}</p>{% if material.content.kind == 'text' %}<p class="preserved">{{ material.content.text }}</p>{% else %}{% for key,document in material.content.documents.items() %}<h3>{{ document.title }}</h3>{% for section in document.sections %}<h4>{{ section.label }}</h4><p class="preserved">{{ section.text }}</p>{% endfor %}{% if document.rows is defined %}{{ budget_rows(document.rows) }}{% endif %}{% endfor %}{% endif %}
+{% for term in material.source_terms %}<h4>Inherited source: {{ term.title }} · version {{ term.version_number }}</h4><p class="preserved">{{ term.license }}
+{{ term.permission_basis }}
+{{ term.notices }}</p>{% endfor %}{% endfor %}</section>
+{% endblock %}

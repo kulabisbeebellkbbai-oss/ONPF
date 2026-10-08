@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ structure.title }} · {{ program.title }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('programs.workspace', program_id=program.id) }}">{{ program.title }}</a></p>
+<h1>{{ structure.title }}</h1><p>Working draft · permission to operate: {{ program.operating_status.replace('_', ' ') }}.</p>
+{% if error %}<p class="error" role="alert">{{ error.message }}</p>{% endif %}
+{% if can_edit %}
+<form method="post" class="no-print" action="{{ url_for('programs.document',program_id=program.id,document_key=structure.key) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="expected_revision" value="{{ expected_revision }}"><input type="hidden" name="draft_document_key" value="{{ structure.key }}"><input type="hidden" name="ai_receipt" value="{{ ai_receipt or '' }}">
+{% for section in structure.sections %}<section><h2><label for="section_{{ section.key }}">{{ section.label }}</label></h2><p id="guidance_{{ section.key }}">{{ section.guidance }}</p>
+{% if not content.sections.get(section.key, '') %}<p>Not yet drafted</p>{% endif %}
+<textarea id="section_{{ section.key }}" name="section_{{ section.key }}" aria-describedby="guidance_{{ section.key }}" rows="6">{{ content.sections.get(section.key, '') }}</textarea></section>{% endfor %}
+{% if structure.key == 'budget' %}<h2>Budget rows</h2><p>Leave unit cost blank when unknown. Amounts are planning information, not approvals. Save to add another set of blank rows.</p>
+{% for row in budget_rows %}<fieldset><legend>{{ 'Budget item ' ~ loop.index if row.item else 'Add a budget item' }}</legend>{% set index=loop.index0 %}
+<label for="item_{{ index }}">Item or resource</label><input id="item_{{ index }}" name="item_{{ index }}" value="{{ row.item }}">
+<label for="quantity_{{ index }}">Quantity</label><input id="quantity_{{ index }}" name="quantity_{{ index }}" value="{{ row.quantity }}">
+<label for="unit_cost_{{ index }}">Unit cost (blank = unknown)</label><input id="unit_cost_{{ index }}" name="unit_cost_{{ index }}" value="{{ row.unit_cost if row.unit_cost is not none else '' }}" inputmode="decimal">
+<label for="cost_status_{{ index }}">Cost status</label><select id="cost_status_{{ index }}" name="cost_status_{{ index }}"><option value="estimated" {{ 'selected' if row.cost_status == 'estimated' else '' }}>Estimated</option><option value="confirmed" {{ 'selected' if row.cost_status == 'confirmed' else '' }}>Confirmed</option></select>
+<label for="notes_{{ index }}">Notes and source</label><input id="notes_{{ index }}" name="notes_{{ index }}" value="{{ row.notes }}">
+</fieldset>{% endfor %}{% endif %}
+<fieldset><legend>Linked owner decisions</legend><p>Link the decisions supporting this draft. These internal references are excluded from group review links.</p>
+{% for decision in decisions %}<label><input type="checkbox" name="decision_ids" value="{{ decision.id }}" {{ 'checked' if decision.id in decision_ids else '' }}> {{ decision.outcome }}{% if decision.supersedes_id %} (superseding decision){% endif %}</label>{% else %}<p>No owner decisions recorded yet.</p>{% endfor %}</fieldset>
+<p><button type="submit">Save draft</button>{% if drafting_ready(program.id) %}<button name="draft_kind" value="document" formaction="{{ url_for('drafting.panel',program_id=program.id) }}" formnovalidate>Review drafting assistance with current wording</button>{% endif %}</p></form>
+{% set origin_target={'kind':'document','document_key':structure.key} %}{% include 'drafting/_origins.html' %}
+{% endif %}
+<h2>Print view of current text</h2><p>Incomplete sections are shown explicitly. Use your browser's print command.</p>
+{% for section in structure.sections %}<h3>{{ section.label }}</h3><p class="preserved">{{ content.sections.get(section.key, '') or 'Not yet drafted' }}</p>{% endfor %}
+{% if structure.key == 'budget' and content.rows %}<table><thead><tr><th>Item</th><th>Quantity</th><th>Unit cost</th><th>Status</th><th>Notes</th></tr></thead><tbody>{% for row in content.rows %}<tr><td>{{ row.item }}</td><td>{{ row.quantity }}</td><td>{{ row.unit_cost if row.unit_cost is not none else 'Unknown' }}</td><td>{{ row.cost_status }}</td><td>{{ row.notes }}</td></tr>{% endfor %}</tbody></table>{% endif %}
+{% endblock %}

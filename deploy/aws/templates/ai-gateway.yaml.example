@@ -1,0 +1,37 @@
+model_list:
+  - model_name: onpf-drafting
+    litellm_params:
+      model: openai/gpt-4o-mini-2024-07-18
+      api_base: https://api.openai.com/v1
+      api_key: os.environ/OPENAI_API_KEY
+      no-log: true
+      num_retries: 0
+      timeout: 30
+litellm_settings:
+  telemetry: false
+  set_verbose: false
+  turn_off_message_logging: true
+  log_raw_request_response: false
+  log_client_error_tracebacks: false
+  cache: false
+  callbacks: []
+  input_callback: []
+  success_callback: []
+  failure_callback: []
+  service_callback: []
+  audit_log_callbacks: []
+  drop_params: false
+  global_disable_no_log_param: false
+router_settings:
+  cache_responses: false
+  num_retries: 0
+  fallbacks: []
+  context_window_fallbacks: []
+  content_policy_fallbacks: []
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  disable_spend_logs: true
+  disable_error_logs: true
+  store_prompts_in_spend_logs: false
+  store_model_in_db: false
+  alerting: []

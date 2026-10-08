@@ -1,0 +1,53 @@
+{
+  "key": "maker",
+  "title": "Maker",
+  "version": "1.0",
+  "prompts": [
+    {
+      "id": "maker-1",
+      "stage": 3,
+      "text": "Which making activities could be appropriate for this group?",
+      "answer_type": "text",
+      "document_key": "delivery",
+      "depends_on": []
+    },
+    {
+      "id": "maker-2",
+      "stage": 4,
+      "text": "Which tools require orientation, supervision, or restrictions?",
+      "answer_type": "text",
+      "document_key": "volunteers",
+      "depends_on": []
+    },
+    {
+      "id": "maker-3",
+      "stage": 3,
+      "text": "What workspace, storage, and protective equipment could be needed?",
+      "answer_type": "text",
+      "document_key": "delivery",
+      "depends_on": []
+    },
+    {
+      "id": "maker-4",
+      "stage": 4,
+      "text": "How could tool access and project costs remain inclusive?",
+      "answer_type": "text",
+      "document_key": "budget",
+      "depends_on": []
+    }
+  ],
+  "readiness_checks": [
+    {
+      "id": "maker-check-1",
+      "text": "Describe tool orientation and supervision needs.",
+      "document_key": "volunteers",
+      "section_key": "skills"
+    },
+    {
+      "id": "maker-check-2",
+      "text": "Record tool, workspace, and protective equipment arrangements.",
+      "document_key": "delivery",
+      "section_key": "arrangements"
+    }
+  ]
+}

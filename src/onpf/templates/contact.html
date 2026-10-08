@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Contact · ONPF{% endblock %}
+{% block content %}
+<h1>Contact ONPF</h1>
+{% if sent %}
+<p class="notice" role="status">Message sent. Thank you for getting in touch.</p>
+<p><a href="{{ url_for('auth.index') }}">Return to ONPF</a></p>
+{% else %}
+<p>Send a comment, ask for help, or request a new workspace or project. A reply address is optional, but we need one to respond.</p>
+{% if not available %}<p class="notice" role="status">The contact form is currently unavailable. Please try again later.</p>{% endif %}
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+<form method="post" action="{{ url_for('contact.contact_page') }}" enctype="multipart/form-data" class="contact-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="contact-trap" aria-hidden="true"><label for="website">Website</label><input id="website" name="website" tabindex="-1" autocomplete="off"></div>
+  <label for="message_type">Message type <span aria-hidden="true">*</span></label>
+  <select id="message_type" name="message_type" required>
+    <option value="">Choose a type</option>
+    {% for value, label in message_types %}<option value="{{ value }}" {% if values.message_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <label for="name">Your name (optional)</label>
+  <input id="name" name="name" maxlength="100" autocomplete="name" value="{{ values.name|default('') }}">
+  <label for="reply_email">Reply email (optional)</label>
+  <input id="reply_email" name="reply_email" type="email" maxlength="254" autocomplete="email" value="{{ values.reply_email|default('') }}">
+  <label for="workspace">Workspace or project name (optional)</label>
+  <input id="workspace" name="workspace" maxlength="150" value="{{ values.workspace|default('') }}">
+  <label for="message">Message <span aria-hidden="true">*</span></label>
+  <textarea id="message" name="message" rows="8" maxlength="2000" required aria-describedby="message-help">{{ values.message|default('') }}</textarea>
+  <p id="message-help" class="field-help">Up to 2000 characters. Please avoid sharing passwords or sensitive personal information.</p>
+  <label for="images">Images (optional)</label>
+  <input id="images" name="images" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple aria-describedby="images-help">
+  <p id="images-help" class="field-help">Up to three PNG, JPEG, GIF or WebP images, 2 MB each. Images are processed before sending; please choose them again if the form reports an error.</p>
+  <button type="submit" {% if not available %}disabled{% endif %}>Send message</button>
+</form>
+<p class="field-help">Messages and images are emailed to the administrator. This site keeps only the message type and time of successful sends.</p>
+{% endif %}
+{% endblock %}

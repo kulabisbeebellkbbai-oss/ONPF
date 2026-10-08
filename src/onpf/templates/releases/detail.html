@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "releases/_documents.html" import documents %}
+{% block title %}{{ release.title }} · Release {{ release.release_number }} · ONPF{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('releases.index', program_id=program.id) }}">Candidates and releases</a></p>
+<h1>{{ release.title }} · release {{ release.release_number }}</h1>
+<p>Design approval recorded {{ release.released_at }}. This release is an immutable snapshot.</p>
+<p class="notice">Permission to operate: <strong>{{ release.operating_status.replace('_', ' ') }}</strong>. Design approval does not confirm operating permission.</p>
+<p class="preserved">{{ release.change_notes }}</p>
+<p>Program revision {{ release.program_revision }}. Framework {{ release.framework.version }}. Content hash: <code>{{ release.content_hash }}</code>.</p>
+<p>{{ pending_input_count }} response{{ '' if pending_input_count == 1 else 's' }} received or corrected for the next cycle.</p>
+<p><a href="{{ url_for('releases.candidate', candidate_id=release.candidate_id) }}">Private approval and frozen coverage record</a></p>
+<p><a href="{{ url_for('exports.print_release', release_id=release.id) }}">Print public documents</a></p>
+{% if is_owner %}<form method="post" action="{{ url_for('exports.package', release_id=release.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button>Download editable public MIT-0 package</button></form><p>The package publishes frozen program documents and selected material versions. Review literal document text and third-party terms before distributing it.</p>{% endif %}
+{% if is_owner %}<form method="post" action="{{ url_for('releases.share_material', release_id=release.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button>Share editable documents as a material version</button></form><p>Publishing shares the literal text of this release’s editable documents under MIT-0. Review ownership and permissions for any included third-party text before sharing.</p>{% endif %}
+<h2>Frozen program context</h2><h3>Purpose</h3><p class="preserved">{{ release.purpose }}</p><h3>Local context</h3><p class="preserved">{{ release.local_context }}</p>
+{{ documents(release) }}
+{% endblock %}

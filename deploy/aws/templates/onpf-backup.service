@@ -1,0 +1,24 @@
+[Unit]
+Description=ONPF verified off-host private backup
+RequiresMountsFor=/var/lib/onpf
+BindsTo=var-lib-onpf.mount
+After=network-online.target var-lib-onpf.mount
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=onpf
+Group=onpf
+UMask=0077
+Environment=TMPDIR=/var/lib/onpf/instance/tmp
+Environment=AWS_PAGER=
+WorkingDirectory=/opt/onpf/current
+ExecStart=/opt/onpf/current/.venv/bin/python /opt/onpf/current/deploy/aws/backup.py --config /etc/onpf/backup.json
+TimeoutStartSec=1800
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/onpf/instance /var/lib/onpf/backups
+RestrictSUIDSGID=true
+CapabilityBoundingSet=

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ program.title }} · ONPF{% endblock %}
+{% block content %}
+{% if program.retired_at %}<p class="notice" role="status">Retired {{ program.retired_at }}. Public access is withdrawn. Authorized private history remains available.</p>{% endif %}
+{% if is_owner %}<details><summary>{{ 'Reactivate privately' if program.retired_at else 'Retire project' }}</summary><p>Retirement withdraws all ONPF public versions, pages and downloads and prevents editing and AI generation. History remains private. Copies downloaded elsewhere cannot be recalled. Reactivation does not restore public links.</p><form method="post" action="{{ url_for('programs.retirement',program_id=program.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="{{ 'reactivate' if program.retired_at else 'retire' }}"><label><input type="checkbox" name="confirmed" value="yes" required> I confirm {{ 'private reactivation without publication' if program.retired_at else 'withdrawal of public pages and downloads' }}</label><button>{{ 'Reactivate privately' if program.retired_at else 'Retire project' }}</button></form></details>{% endif %}
+<p><a href="{{ url_for('programs.index') }}">All programs</a></p>
+<h1>{{ program.title }}</h1>
+<p class="notice">Design documents: working drafts. Permission to operate: <strong>{{ program.operating_status.replace('_', ' ') }}</strong>. No design approval is implied.</p>
+<p>Filed permission evidence: <strong>{{ readiness.operating_permission.status.replace('_', ' ') }}</strong>. {% for issue in readiness.operating_permission.issues %}{{ issue }} {% endfor %}{% if can_edit %}<a href="{{ url_for('permissions.index', program_id=program.id) }}">Review private permission and copy distribution</a>{% endif %}</p>
+{% if can_edit %}<p>Decision owners: {% for member in program.memberships if member.role == 'owner' %}{{ member.username }}{{ ', ' if not loop.last else '' }}{% endfor %}. Approval requires {{ 'all listed owners' if program.approval_rule == 'all' else 'any one listed owner' }}.</p>{% else %}<p>View-only project access. You can read the workspace and draft documents.</p>{% endif %}
+{% if is_owner %}<p><a href="{{ url_for('programs.settings', program_id=program.id) }}">Edit setup and access</a></p>{% endif %}
+{% if is_owner %}<p><a href="{{ url_for('publications.publish_page', program_id=program.id) }}">Review and publish a public project version</a></p>{% endif %}
+<p class="preserved">{{ program.purpose or 'Purpose not yet drafted.' }}</p>
+<h2>Draft documents</h2>
+{% if can_edit %}<p><a href="{{ url_for('inquiries.index', program_id=program.id) }}">Inquiry batches and invitations</a></p>
+<h2>Clarification rounds</h2><p><a href="{{ url_for('inquiries.compose', program_id=program.id, clarification=True) }}">Draft another clarification round</a> · <a href="{{ url_for('inquiries.index', program_id=program.id) }}">Review round answers, pending questions and deferrals</a></p>
+{% if drafting_ready(program.id) %}<p><a href="{{ url_for('drafting.panel',program_id=program.id,kind='questions') }}">Review AI assistance for draft clarification questions</a> · <a href="{{ url_for('drafting.panel',program_id=program.id,kind='review') }}">Review evidence with drafting assistance</a></p>{% endif %}
+<ul>{% for round in clarification_rounds %}<li><a href="{{ url_for('inquiries.detail', batch_id=round.id) }}">Version {{ round.version }}: {{ round.title }}</a> · {{ round.answered_count }} answered · {{ round.pending_count }} unanswered · {{ round.deferred_count }} with deferrals{% if round.closed_at %} · Closed{% endif %}</li>{% else %}<li>No clarification rounds issued yet.</li>{% endfor %}</ul>
+<p><a href="{{ url_for('refinement.board', program_id=program.id) }}">Refine contributions, review coverage, and record decisions</a></p>
+<p><a href="{{ url_for('materials.library', program_id=program.id) }}">Shared materials, released versions, and local adaptations</a></p>
+<p><a href="{{ url_for('releases.index', program_id=program.id) }}">Prepare candidates, record owner approvals, and view releases</a></p>{% endif %}
+<ul>{% for key,structure in framework.documents.items() %}<li><a href="{{ url_for('programs.document', program_id=program.id, document_key=key) }}">{{ structure.title }}</a></li>{% endfor %}</ul>
+<h2>Additional documents and program media</h2><p>Create and manage recipe cards, pantry wall posters, other handouts, and existing-file attachments alongside the framework documents.</p><p><a href="{{ url_for('additional_documents.index', program_id=program.id) }}">Open additional documents</a></p>
+<h2>Program-development pathway</h2>
+<p>Explore stages in any order. Missing sections stay visible; writing a section does not approve it.</p>
+<nav aria-label="Development stages" style="margin:0;flex-wrap:wrap">{% for stage in framework.stages %}<a href="#stage-{{ stage.number }}">{{ stage.number }}. {{ stage.title }}</a>{% endfor %}</nav>
+{% for stage in readiness.stages %}<section id="stage-{{ stage.number }}"><h2>{{ stage.number }}. {{ stage.title }}</h2>
+<ul>{% for key in stage.document_keys %}<li><a href="{{ url_for('programs.document', program_id=program.id, document_key=key) }}">{{ framework.documents[key].title }}</a></li>{% endfor %}</ul>
+<details><summary>Inquiry prompts for this stage</summary><ul>{% for key in ['core'] + program.module_keys %}{% for prompt in framework.modules[key].prompts if prompt.stage == stage.number %}<li>{{ prompt.text }}</li>{% endfor %}{% endfor %}</ul></details>
+{% if stage.missing %}<details><summary>{{ stage.missing|length }} sections not yet drafted</summary><ul>{% for section in stage.missing %}<li>{{ section }}</li>{% endfor %}</ul></details>{% else %}<p>All linked sections contain draft text; owner review is still needed.</p>{% endif %}
+</section>{% endfor %}
+{% if readiness.module_checks %}<h2>Activity readiness checks</h2><p>These checks guide local review. Draft text does not prove a requirement has been met.</p><ul>{% for check in readiness.module_checks %}<li>{{ check.text }} — {{ 'draft text available for review' if check.drafted else 'not yet drafted' }}</li>{% endfor %}</ul>{% endif %}
+{% endblock %}

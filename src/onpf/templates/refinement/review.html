@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block title %}Group review draft{% endblock %}
+{% block content %}
+{% if public %}
+{% if error %}<h1>Review link unavailable</h1><p role="alert">{{ error.message }}</p>{% else %}
+<h1>{{ draft.title }} · group review draft</h1><p>Frozen working draft created {{ draft.created_at }}. This is for review; no release approval or permission to operate is implied.</p>
+{% for key, document in draft.documents.items() %}<section><h2>{{ draft.document_titles[key] }}</h2>{% for section in draft.document_sections[key] %}<h3>{{ section.label }}</h3><p class="preserved">{{ document.sections.get(section.key, '') or 'Not yet drafted' }}</p>{% endfor %}
+{% if key == 'budget' and document.rows %}<table><thead><tr><th>Item</th><th>Quantity</th><th>Unit cost</th><th>Status</th><th>Notes</th></tr></thead><tbody>{% for row in document.rows %}<tr><td>{{ row.item }}</td><td>{{ row.quantity }}</td><td>{{ row.unit_cost if row.unit_cost is not none else 'Unknown' }}</td><td>{{ row.cost_status }}</td><td>{{ row.notes }}</td></tr>{% endfor %}</tbody></table>{% endif %}</section>{% endfor %}
+<p>Use your browser's print command for a paper review copy.</p>{% endif %}
+{% else %}
+<p><a href="{{ url_for('refinement.board', program_id=program.id) }}">Refinement</a></p><h1>Group review drafts</h1>
+<p>Freeze selected document text behind a separate, read-only revocable link. The link excludes raw inputs, contributor details, internal decision rationale, and source references.</p>
+<p>Review the selected document text before sharing: everything written in those documents will be visible. Follow-up feedback can be collected through a separate <a href="{{ url_for('inquiries.index', program_id=program.id) }}">inquiry batch and invitation</a>.</p>
+{% if error %}<p class="error" role="alert">{{ error.message }}</p>{% endif %}
+{% if created %}<p class="notice" role="status">Review draft created. Copy this link now; its secret is shown only once.</p><p><a href="{{ url_for('refinement.public_review', token=created.token) }}">Open frozen review draft</a></p>{% endif %}
+<form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><fieldset><legend>Documents to share for review</legend>{% for key, document in framework.documents.items() %}<label><input type="checkbox" name="document_keys" value="{{ key }}" {{ 'checked' if key in values else '' }}> {{ document.title }}</label>{% endfor %}</fieldset><button type="submit">Create frozen review draft</button></form>
+<h2>Review link history</h2>{% for review in reviews %}<article><p>{{ review.created_at }} · program revision {{ review.program_revision }} · {{ 'revoked' if review.revoked_at else 'active' }}</p>{% if not review.revoked_at %}<form method="post" action="{{ url_for('refinement.revoke', program_id=program.id, review_id=review.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit">Revoke review link</button></form>{% endif %}</article>{% else %}<p>No group review drafts yet.</p>{% endfor %}
+{% endif %}
+{% endblock %}

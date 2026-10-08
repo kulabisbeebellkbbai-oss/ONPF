@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ error.status }} · ONPF{% endblock %}
+{% block content %}
+<h1>{{ error.message }}</h1>
+<p role="alert">The operation did not complete.</p>
+{% if submitted %}
+<h2>Your entered information</h2>
+<p>Copy this information before returning to the form.</p>
+<dl>{% for key, value in submitted.items() %}<dt>{{ key.replace('_',' ') }}</dt><dd class="preserved">{{ value }}</dd>{% endfor %}</dl>
+{% endif %}
+<p><a href="{{ url_for('auth.workspace') }}">Return to workspace</a></p>
+{% endblock %}

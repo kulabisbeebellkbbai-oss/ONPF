@@ -1,0 +1,42 @@
+{% macro evidence_text(value) %}
+{% if value is mapping %}<dl>{% for key, child in value.items() %}<dt>{{ key.replace('_', ' ') }}</dt><dd>{{ evidence_text(child) }}</dd>{% endfor %}</dl>
+{% elif value is string %}<span class="preserved">{{ value }}</span>
+{% elif value is iterable %}<ul>{% for child in value %}<li>{{ evidence_text(child) }}</li>{% else %}<li>None recorded</li>{% endfor %}</ul>
+{% else %}{{ value if value is not none else 'Unknown / unresolved' }}{% endif %}
+{% endmacro %}
+
+{% macro editor(target, fields, prefix, framework, sources) %}
+<input type="hidden" name="{{ prefix }}editor" value="yes">
+{% if target.kind == 'questions' %}
+{% set questions=fields.get('questions', []) %}
+<input type="hidden" name="{{ prefix }}question_count" value="{{ questions|length if questions else 1 }}">
+{% for question in questions or [{'text':'', 'stage':target.get('stage',1), 'document_key':target.get('document_key','overview')}] %}
+{% set stem=prefix ~ 'q' ~ loop.index0 ~ '_' %}
+<fieldset><legend>Question {{ loop.index }}</legend>
+<label for="{{ stem }}text">Question wording</label><textarea id="{{ stem }}text" name="{{ stem }}text" maxlength="8000" rows="4">{{ question.text }}</textarea>
+<label for="{{ stem }}reason">Why this question is needed</label><textarea id="{{ stem }}reason" name="{{ stem }}reason" maxlength="4000" rows="3">{{ question.get('reason','') }}</textarea>
+<label for="{{ stem }}group_label">Question group</label><input id="{{ stem }}group_label" name="{{ stem }}group_label" value="{{ question.get('group_label','') }}" maxlength="200">
+{% for key in ['why','source_type','source_id'] %}<input type="hidden" name="{{ stem }}{{ key }}" value="{{ question.get(key,'') }}">{% endfor %}
+<label for="{{ stem }}stage">Development stage</label><select id="{{ stem }}stage" name="{{ stem }}stage">{% for stage in framework.stages %}<option value="{{ stage.number }}" {{ 'selected' if question.stage == stage.number else '' }}>{{ stage.number }}. {{ stage.title }}</option>{% endfor %}</select>
+<label for="{{ stem }}document_key">Related document</label><select id="{{ stem }}document_key" name="{{ stem }}document_key">{% for key,document in framework.documents.items() %}<option value="{{ key }}" {{ 'selected' if question.document_key == key else '' }}>{{ document.title }}</option>{% endfor %}</select>
+<fieldset><legend>Question support</legend>{% for source in sources %}<label><input type="checkbox" name="{{ stem }}source_handles" value="{{ source.handle }}" {{ 'checked' if source.handle in question.get('source_handles', []) else '' }}> {{ source_label(source) }} · revision {{ source.revision }}</label>{% else %}<p>No selected sources.</p>{% endfor %}{% for handle in question.get('source_handles',[]) if handle not in sources|map(attribute='handle')|list %}<label class="notice"><input type="checkbox" name="{{ stem }}source_handles" value="{{ handle }}" checked> Unavailable question support: {{ handle }}. Review before deselecting.</label>{% endfor %}</fieldset>
+</fieldset>{% endfor %}
+{% elif target.kind in ['proposal', 'decision'] %}
+{% set text_fields=['title','theme','text'] if target.kind == 'proposal' else ['outcome','rationale'] %}
+{% for key in text_fields %}<label for="{{ prefix }}{{ key }}">{{ {'text':'Proposed design text','rationale':'Internal rationale'}.get(key,key.title()) }}</label>{% if key in ['title','theme'] %}<input id="{{ prefix }}{{ key }}" name="{{ prefix }}{{ key }}" value="{{ fields.get(key,'') }}" maxlength="200">{% else %}<textarea id="{{ prefix }}{{ key }}" name="{{ prefix }}{{ key }}" maxlength="50000" rows="5">{{ fields.get(key,'') }}</textarea>{% endif %}{% endfor %}
+{% for key,kind in [('response_ids','response'),('proposal_ids','proposal')] if key == 'response_ids' or target.kind == 'decision' %}<fieldset><legend>{{ 'Source responses' if kind == 'response' else 'Linked proposals' }}</legend>{% set available=sources|selectattr('kind','equalto',kind)|map(attribute='record_key')|list %}{% for source in sources|selectattr('kind','equalto',kind)|unique(attribute='record_key') %}<label><input type="checkbox" name="{{ prefix }}{{ key }}" value="{{ source.record_key }}" {{ 'checked' if source.record_key in fields.get(key,[]) else '' }}> {{ source_label(source) }}</label>{% endfor %}{% for key_value in fields.get(key,[]) if key_value not in available %}<label class="notice"><input type="checkbox" name="{{ prefix }}{{ key }}" value="{{ key_value }}" checked> Unavailable linked source: {{ key_value }}. Review before deselecting.</label>{% endfor %}</fieldset>{% endfor %}
+{% if target.kind == 'decision' %}<label for="{{ prefix }}supersedes_id">Supersedes a previous owner decision</label><select id="{{ prefix }}supersedes_id" name="{{ prefix }}supersedes_id"><option value="">New independent decision</option>{% for source in sources if source.kind == 'decision' %}<option value="{{ source.record_key }}" {{ 'selected' if source.record_key == fields.get('supersedes_id') else '' }}>{{ source_label(source) }}</option>{% endfor %}{% if fields.get('supersedes_id') and fields.supersedes_id not in sources|selectattr('kind','equalto','decision')|map(attribute='record_key')|list %}<option value="{{ fields.supersedes_id }}" selected>Unavailable selected decision: {{ fields.supersedes_id }}</option>{% endif %}</select>{% endif %}
+{% elif target.kind == 'document' %}
+{% for section in framework.documents[target.document_key].sections %}<label for="{{ prefix }}section_{{ section.key }}">{{ section.label }}</label><p>{{ section.guidance }}</p><textarea id="{{ prefix }}section_{{ section.key }}" name="{{ prefix }}section_{{ section.key }}" maxlength="50000" rows="5">{{ fields.get('sections',{}).get(section.key,'') }}</textarea>{% endfor %}
+{% if target.document_key == 'budget' %}<p>Blank unit cost means unknown. Costs remain planning information.</p>{% for row in fields.get('rows',[]) + [{'item':'','quantity':'','unit_cost':none,'cost_status':'estimated','notes':''}] %}{% set index=loop.index0 %}<fieldset><legend>Budget item {{ loop.index }}</legend>{% for key,label in [('item','Item or resource'),('quantity','Quantity'),('unit_cost','Unit cost (blank = unknown)'),('notes','Notes and source')] %}<label for="{{ prefix }}{{ key }}_{{ index }}">{{ label }}</label><input id="{{ prefix }}{{ key }}_{{ index }}" name="{{ prefix }}{{ key }}_{{ index }}" value="{{ row[key] if row[key] is not none else '' }}">{% endfor %}<label for="{{ prefix }}cost_status_{{ index }}">Cost status</label><select id="{{ prefix }}cost_status_{{ index }}" name="{{ prefix }}cost_status_{{ index }}"><option value="estimated" {{ 'selected' if row.cost_status == 'estimated' else '' }}>Estimated</option><option value="confirmed" {{ 'selected' if row.cost_status == 'confirmed' else '' }}>Confirmed</option></select></fieldset>{% endfor %}{% endif %}
+<fieldset><legend>Linked owner decisions</legend>{% for source in sources if source.kind == 'decision' %}<label><input type="checkbox" name="{{ prefix }}decision_ids" value="{{ source.record_key }}" {{ 'checked' if source.record_key in fields.get('decision_ids',[]) else '' }}> {{ source_label(source) }}</label>{% endfor %}{% for key_value in fields.get('decision_ids',[]) if key_value not in sources|selectattr('kind','equalto','decision')|map(attribute='record_key')|list %}<label class="notice"><input type="checkbox" name="{{ prefix }}decision_ids" value="{{ key_value }}" checked> Unavailable linked decision: {{ key_value }}. Review before deselecting.</label>{% endfor %}</fieldset>
+{% elif target.kind == 'supporting' %}
+{% from 'additional_documents/_blocks.html' import block_editor %}
+<label>Material title<input name="{{ prefix }}title" value="{{ fields.get('title','') }}" maxlength="200"></label>
+{{ block_editor(fields.get('structured',{}),prefix) }}
+{% endif %}
+{% endmacro %}
+
+{% macro findings(result) %}
+<h2>Review findings</h2>{% for finding in result.fields.findings %}<article><h3>Finding {{ loop.index }}</h3><p class="preserved">{{ finding.text }}</p><p class="preserved">Why: {{ finding.reason }}</p><ul>{% for handle in finding.source_handles %}<li>{{ handle }}</li>{% endfor %}</ul></article>{% else %}<p>No findings returned.</p>{% endfor %}
+{% endmacro %}

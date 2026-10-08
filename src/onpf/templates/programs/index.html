@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Your programs</h1>
+<p>Each program has its own drafts, decision owners, and permission to operate.</p>
+{% if can_create_projects %}<p><a class="button" href="{{ url_for('programs.create') }}">Create a program</a></p>{% endif %}
+<ul class="program-list">
+{% for program in programs %}<li><a href="{{ url_for('programs.workspace', program_id=program.id) }}">{{ program.title }}</a><p>Permission to operate: {{ program.operating_status.replace('_', ' ') }} · {{ program.role }}</p></li>{% else %}<li>No programs yet.</li>{% endfor %}
+</ul>
+{% endblock %}

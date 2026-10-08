@@ -1,0 +1,31 @@
+[Unit]
+Description=ONPF private application
+RequiresMountsFor=/var/lib/onpf
+BindsTo=var-lib-onpf.mount
+After=network.target var-lib-onpf.mount
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=onpf
+Group=onpf
+UMask=0077
+EnvironmentFile=/etc/onpf/production.env
+EnvironmentFile=-/etc/onpf/ai-drafting.env
+Environment=TMPDIR=/var/lib/onpf/instance/tmp
+WorkingDirectory=/opt/onpf/current
+ExecStart=/opt/onpf/current/.venv/bin/python -m onpf.production
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=45
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/onpf/instance
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

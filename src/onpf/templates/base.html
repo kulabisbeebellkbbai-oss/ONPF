@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}ONPF workspace{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body class="{% block body_class %}workspace-page{% endblock %}">
+{% include '_site_header.html' %}
+<main id="main" class="{% block main_class %}page-content{% endblock %}">
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% for category, message in messages %}<p class="notice" role="status">{{ message }}</p>{% endfor %}
+{% endwith %}
+{% if program is defined and program.id is defined and program.access_role is defined %}{% include '_workflow_sidebar.html' %}{% endif %}
+{% block content %}
+<h1>Your program workspace</h1>
+<p>Develop community programs, collect contributions, and prepare reusable documents.</p>
+{% if 'programs' in current_app.blueprints and can_create_projects %}<p><a class="button" href="/programs/new">Create a program</a></p>{% endif %}
+{% if programs %}
+<ul class="program-list">
+{% for program in programs %}<li><a href="/programs/{{ program.id }}">{{ program.title }}</a><p>{{ program.operating_status }} · {{ program.role }}</p></li>{% endfor %}
+</ul>
+{% else %}<p>No programs have been assigned to this account yet.</p>{% endif %}
+{% endblock %}
+</main>
+{% include '_site_footer.html' %}
+</body>
+</html>

@@ -1,0 +1,11 @@
+[Unit]
+Description=ONPF five-minute operational metrics
+
+[Timer]
+OnBootSec=120
+OnUnitActiveSec=300
+AccuracySec=10
+Unit=onpf-monitor.service
+
+[Install]
+WantedBy=timers.target

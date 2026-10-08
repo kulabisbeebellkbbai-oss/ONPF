@@ -1,0 +1,23 @@
+{
+  "public_host": "onpf.example.org",
+  "volume_id": "vol-00000000000000000",
+  "data_root": "/var/lib/onpf",
+  "instance": "/var/lib/onpf/instance",
+  "database": "/var/lib/onpf/instance/onpf.sqlite3",
+  "staging": "/var/lib/onpf/backups",
+  "bucket": "replace-with-backup-bucket-output",
+  "prefix": "backups/",
+  "region": "us-east-2",
+  "stack": "replace-with-stack-name",
+  "local_keep": 3,
+  "request_rate_per_second": 10,
+  "request_burst": 40,
+  "login_rate_per_minute": 6,
+  "login_burst": 5,
+  "contact_to": "",
+  "smtp_host": "",
+  "smtp_port": 587,
+  "smtp_from": "",
+  "smtp_user": "",
+  "smtp_password_file": ""
+}

@@ -1,0 +1,7 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Contribution receipt</title><link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}"></head><body>{% include "_site_header.html" %}<main id="main" class="page-content">
+<h1>Responses received</h1><p>{{ receipt.response_count }} responses saved.</p>
+<p>Submission reference: <strong>{{ receipt.submission_id }}</strong></p>
+<p>Keep this reference when requesting a correction from the facilitator. Corrections preserve the original input and append the requested change. Inclusion in the input record does not imply adoption into the final program.</p>
+{% if invitation %}<p>This receipt shows only the count and reference for this browser’s most recent submission. Your invitation lets you contribute; the facilitator can help with correction requests.</p><p><a href="{{ url_for('inquiries.answer') }}">Open a fresh response form</a></p>
+{% else %}<ul>{% for response_id in receipt.response_ids %}<li><a href="{{ url_for('contributions.history', response_id=response_id) }}">{{ record_label('response',response_id) }}</a></li>{% endfor %}</ul><p><a href="{{ url_for('auth.workspace') }}">Workspace</a></p>{% endif %}
+</main>{% include "_site_footer.html" %}</body></html>

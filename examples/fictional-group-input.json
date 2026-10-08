@@ -1,0 +1,10 @@
+{
+  "label": "FICTIONAL training input only. No actual Bridge participant input or operating approval.",
+  "responses": [
+    {"text": "FICTIONAL: I would like a quiet painting option.", "attribution": "named", "display_name": "Fictional Alex", "entry_method": "meeting"},
+    {"text": "FICTIONAL: I prefer making useful objects instead of painting.", "attribution": "alias", "display_name": "Fictional River", "entry_method": "paper"},
+    {"text": "", "answer_state": "abstain", "attribution": "anonymous", "entry_method": "direct"}
+  ],
+  "correction": "FICTIONAL correction: a quiet painting option with breaks.",
+  "dispositions": ["incorporated", "declined", "deferred"]
+}

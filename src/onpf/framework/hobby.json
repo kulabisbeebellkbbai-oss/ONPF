@@ -1,0 +1,53 @@
+{
+  "key": "hobby",
+  "title": "Hobby",
+  "version": "1.0",
+  "prompts": [
+    {
+      "id": "hobby-1",
+      "stage": 3,
+      "text": "Which hobbies could people try or share?",
+      "answer_type": "text",
+      "document_key": "delivery",
+      "depends_on": []
+    },
+    {
+      "id": "hobby-2",
+      "stage": 4,
+      "text": "What supplies can be shared, borrowed, or brought by participants?",
+      "answer_type": "text",
+      "document_key": "budget",
+      "depends_on": []
+    },
+    {
+      "id": "hobby-3",
+      "stage": 3,
+      "text": "How could beginners and experienced participants take part together?",
+      "answer_type": "text",
+      "document_key": "delivery",
+      "depends_on": []
+    },
+    {
+      "id": "hobby-4",
+      "stage": 3,
+      "text": "What practical boundaries or local checks apply to the chosen hobbies?",
+      "answer_type": "text",
+      "document_key": "delivery",
+      "depends_on": []
+    }
+  ],
+  "readiness_checks": [
+    {
+      "id": "hobby-check-1",
+      "text": "Identify optional hobbies and participation arrangements.",
+      "document_key": "delivery",
+      "section_key": "activities"
+    },
+    {
+      "id": "hobby-check-2",
+      "text": "Record practical boundaries for the chosen hobbies.",
+      "document_key": "delivery",
+      "section_key": "arrangements"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <a class="brand" href="{{ url_for('auth.index') }}" aria-label="ONPF home">ONPF<span aria-hidden="true">.</span></a>
+  <span class="site-tagline">Community-program design</span>
+  <nav aria-label="Main navigation">
+    <a href="{{ url_for('publications.directory') }}">Public projects</a>
+    {% if principal.user_id %}
+    <a href="{{ url_for('programs.index') }}">Programs</a>
+    <a href="{{ url_for('auth.workspace') }}">Workspace</a>
+    {% if can_manage %}<a href="/admin/">Administration app</a>{% endif %}
+    <form method="post" action="{{ url_for('auth.logout') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit">Sign out</button>
+    </form>
+    {% else %}
+    <a href="{{ url_for('auth.login') }}#about-onpf">About the system</a>
+    <a href="{{ url_for('auth.login') }}#sign-in">Sign in ↗</a>
+    {% endif %}
+  </nav>
+</header>

@@ -1,0 +1,5 @@
+{% macro budget_rows(rows) %}
+<h3>Budget rows</h3><p>Estimated costs are planning values. Blank costs remain unknown.</p>
+<table class="public-budget"><colgroup><col class="budget-item"><col class="budget-quantity"><col class="budget-cost"><col class="budget-status"><col class="budget-notes"></colgroup><thead><tr>{% for label in ['Item','Quantity','Unit cost','Status','Notes'] %}<th scope="col">{{ label }}</th>{% endfor %}</tr></thead>
+<tbody>{% for row in rows %}<tr>{% for field in ['item','quantity','unit_cost','cost_status','notes'] %}<td class="preserved">{{ row[field] if row[field] is not none else 'Unknown' }}</td>{% endfor %}</tr>{% endfor %}</tbody></table>
+{% endmacro %}

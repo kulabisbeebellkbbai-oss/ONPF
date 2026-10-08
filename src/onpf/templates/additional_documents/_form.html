@@ -1,0 +1,21 @@
+<form method="post" enctype="multipart/form-data">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<input type="hidden" name="expected_revision" value="{{ request.form.get('expected_revision', program.revision) }}">
+<input type="hidden" name="template_key" value="{{ template_key }}">
+<label for="media-title">Document title</label><input id="media-title" name="title" maxlength="200" required value="{{ values.title }}">
+{% for section in templates[template_key].sections %}<section><h3><label for="media-{{ section.key }}">{{ section.label }}</label></h3>
+<p id="hint-{{ section.key }}">{{ section.guidance }}</p>
+<textarea id="media-{{ section.key }}" name="section_{{ section.key }}" aria-describedby="hint-{{ section.key }}" rows="5">{{ values.sections.get(section.key, '') }}</textarea></section>{% endfor %}
+<fieldset><legend>Rights and reuse</legend>
+<p>Record terms before including media in a public project version. Uploaded third-party work keeps its own license.</p>
+<label for="media-basis">Ownership basis</label><select id="media-basis" name="ownership_basis"><option value="own_work" {{ 'selected' if values.ownership_basis == 'own_work' else '' }}>Created by this project</option><option value="third_party" {{ 'selected' if values.ownership_basis == 'third_party' else '' }}>Third-party work</option></select>
+<label for="media-permission">Permission basis</label><input id="media-permission" name="permission_basis" maxlength="5000" required value="{{ values.permission_basis }}">
+<label for="media-license">License or use terms</label><input id="media-license" name="license" maxlength="5000" required value="{{ values.license }}">
+<label for="media-notices">Attribution and notices</label><textarea id="media-notices" name="notices" rows="3">{{ values.notices }}</textarea>
+</fieldset>
+<label for="media-attachment">Attach existing PDF, ODT, PNG, or JPEG (maximum 5 MiB)</label><input id="media-attachment" type="file" name="attachment" accept=".pdf,.odt,.png,.jpg,.jpeg">
+{% if item is defined and item.upload_name %}<p>Current attachment: <a href="{{ url_for('additional_documents.attachment', program_id=program.id, document_id=item.id) }}">{{ item.upload_name }}</a>. A new file replaces it.</p><label><input type="checkbox" name="remove_upload" value="yes"> Remove current attachment</label>{% endif %}
+<label><input type="checkbox" name="include_in_public" value="yes" {{ 'checked' if values.include_in_public else '' }}> Offer this item for the next owner-reviewed public project version</label>
+<p>Selection alone does not publish. The owner must review the literal text, rights, and attachment before publishing.</p>
+<button type="submit">Save additional document</button>
+</form>

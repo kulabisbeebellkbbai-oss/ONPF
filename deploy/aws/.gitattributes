@@ -1,0 +1,4 @@
+gateway-requirements*.in text eol=lf
+gateway-requirements*.lock text eol=lf
+gateway-lock-metadata.json text eol=lf
+ai-gateway.example.json text eol=lf

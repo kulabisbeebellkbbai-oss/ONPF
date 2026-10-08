@@ -1,0 +1,53 @@
+{
+  "key": "art",
+  "title": "Art",
+  "version": "1.0",
+  "prompts": [
+    {
+      "id": "art-1",
+      "stage": 3,
+      "text": "What art activities and materials would suit the intended participants?",
+      "answer_type": "text",
+      "document_key": "delivery",
+      "depends_on": []
+    },
+    {
+      "id": "art-2",
+      "stage": 3,
+      "text": "How could art sessions welcome different experience levels and access needs?",
+      "answer_type": "text",
+      "document_key": "delivery",
+      "depends_on": []
+    },
+    {
+      "id": "art-3",
+      "stage": 4,
+      "text": "What preparation and support do volunteer art facilitators need?",
+      "answer_type": "text",
+      "document_key": "volunteers",
+      "depends_on": []
+    },
+    {
+      "id": "art-4",
+      "stage": 3,
+      "text": "How should sessions handle materials, cleanup, and consent to share artwork?",
+      "answer_type": "text",
+      "document_key": "session-plan",
+      "depends_on": []
+    }
+  ],
+  "readiness_checks": [
+    {
+      "id": "art-check-1",
+      "text": "Identify art material handling, cleanup, and artwork sharing arrangements.",
+      "document_key": "delivery",
+      "section_key": "arrangements"
+    },
+    {
+      "id": "art-check-2",
+      "text": "Describe preparation and support for art facilitators.",
+      "document_key": "volunteers",
+      "section_key": "skills"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Community-program inquiry</title><link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}"></head>
+<body>{% include "_site_header.html" %}<main id="main" class="page-content">
+{% if error %}<p class="error" role="alert">{{ error.message }}</p>{% endif %}
+{% if invitation %}<form id="invitation-access" method="post" action="{{ url_for('inquiries.accept') }}" {% if batch %}hidden{% endif %}>
+<h1>Open an inquiry invitation</h1><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label for="access-code">Invitation access code</label><input id="access-code" name="token" type="password" autocomplete="off" required><button type="submit">Open inquiry</button><p>A link normally opens automatically. Without JavaScript, paste the part of your invitation link after # here.</p></form>{% else %}<p><a href="{{ url_for('inquiries.detail', batch_id=batch.id) }}">Inquiry batch</a> · <a href="{{ url_for('contributions.index', program_id=batch.program_id) }}">Private response history</a></p>{% endif %}
+{% if batch %}<h1>{{ batch.title }}</h1><p>Batch version {{ batch.version }}</p>
+<section aria-labelledby="project-context-heading">
+<h2 id="project-context-heading">Project you are contributing to</h2>
+<p><strong>Working title:</strong> {{ batch.program_context.title }}</p>
+<h3>Purpose</h3><p class="preserved">{{ batch.program_context.purpose or 'Purpose not yet drafted.' }}</p>
+<h3>Local context</h3><p class="preserved">{{ batch.program_context.local_context or 'Local context not yet drafted.' }}</p>
+<p><strong>Permission to operate:</strong> {{ batch.program_context.operating_status.replace('_', ' ')|capitalize }}</p>
+<p>Permission to operate is recorded separately from design approval.</p>
+</section>
+<p class="preserved">{{ batch.instructions }}</p>{% if batch.target_group %}<p>Target group: {{ batch.target_group }}</p>{% endif %}{% if batch.due_date %}<p>Advisory due date: {{ batch.due_date }}. The batch stays open until closed.</p>{% endif %}<p class="notice preserved">{{ batch.intake_copy }}</p>
+{% include 'contributions/entry.html' %}{% endif %}
+</main>{% include "_site_footer.html" %}<script src="{{ url_for('static', filename='invitation.js') }}" defer></script></body></html>

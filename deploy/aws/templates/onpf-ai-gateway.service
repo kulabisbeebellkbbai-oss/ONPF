@@ -1,0 +1,32 @@
+[Unit]
+Description=ONPF private AI gateway
+After=network.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=onpf-ai-gateway
+Group=onpf-ai-gateway
+UMask=0077
+EnvironmentFile=/etc/onpf-ai-gateway/gateway.env
+WorkingDirectory=/opt/onpf-ai-gateway
+ExecStart=/opt/onpf-ai-gateway/venv/bin/python /opt/onpf-ai-gateway/launch_ai_gateway.py
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=45
+StandardOutput=null
+StandardError=null
+LimitCORE=0
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+ProtectSystem=strict
+InaccessiblePaths=/var/lib/onpf /etc/onpf /opt/onpf
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

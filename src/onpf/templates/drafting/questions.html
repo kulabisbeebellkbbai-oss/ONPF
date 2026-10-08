@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% from 'drafting/_suggestions.html' import editor %}
+{% block title %}Review unsaved draft questions · {{ program.title }}{% endblock %}
+{% block content %}
+<h1>Review unsaved draft questions</h1><p>Apply has prepared this form without saving or issuing questions. Save drafts, then review and issue a separate clarification round.</p>
+{% if error %}<p class="error" role="alert">{{ error.message }}</p>{% endif %}
+<form method="post" action="{{ url_for('inquiries.save_drafts',program_id=program.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="expected_revision" value="{{ expected_revision }}"><input type="hidden" name="ai_receipt" value="{{ ai_receipt or '' }}"><input type="hidden" name="sources" value="{{ sources|tojson|forceescape }}">
+{% for question in questions %}{% if question.id %}<input type="hidden" name="q{{ loop.index0 }}_id" value="{{ question.id }}">{% endif %}{% endfor %}
+{{ editor({'kind':'questions'},{'questions':questions},'',framework,sources) }}
+{% for question in questions %}{% set index=loop.index0 %}<fieldset><legend>Owner decision dependencies for question {{ loop.index }}</legend><p>Unchecked dependencies keep this question independent. Participant responses do not establish owner decisions.</p>{% set dependencies=question.get('depends_on',[]) %}{% for field in fields %}<label><input type="checkbox" name="q{{ index }}_dep_{{ field.key }}" value="yes" {% if field.key in dependencies|map(attribute='field')|list %}checked{% endif %}> Require {{ field.label }}</label><label for="q{{ index }}_equals_{{ field.key }}">Required value for {{ field.label }}</label><input id="q{{ index }}_equals_{{ field.key }}" name="q{{ index }}_equals_{{ field.key }}" value="{% for dependency in dependencies if dependency.field == field.key %}{{ dependency.equals }}{% endfor %}">{% else %}<p>No owner decision fields defined.</p>{% endfor %}</fieldset>{% endfor %}
+<button type="submit">Save draft questions</button></form>
+<p><a href="{{ url_for('inquiries.compose',program_id=program.id,clarification=True) }}">Review clarification rounds</a></p>
+{% endblock %}

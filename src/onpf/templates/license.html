@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}MIT No Attribution License · ONPF{% endblock %}
+{% block content %}
+<h1>MIT No Attribution License</h1>
+<p>ONPF code and original framework are licensed under MIT-0. Third-party components and contributed materials retain their own applicable terms.</p>
+<p><a href="{{ url_for('static', filename='LICENSE.txt') }}">Plain-text license</a> · <a href="https://opensource.org/license/mit-0">Open Source Initiative reference</a></p>
+<pre class="preserved">{{ license_text }}</pre>
+<p><a href="{{ url_for('auth.login') }}">Return to sign in</a></p>
+{% endblock %}

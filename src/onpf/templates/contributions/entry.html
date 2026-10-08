@@ -1,0 +1,32 @@
+<h2>Share your responses</h2>
+<p>Your input may be used for internal program development. Inclusion in the input record does not imply adoption into the final program. Quotation in public material is a separate choice; the default is no quotation permission.</p>
+<p>Leave a question blank or choose “Skip” to omit it. “Abstain” and “Not applicable” save explicit records. Multiple responses to each question are welcome.</p>
+{% if not invitation %}<p>You are entering responses through your account. For paper or meeting transcription, identify the contributor using their requested name, alias, anonymous, or group choice. Your account is recorded separately as the person entering the response.</p>{% endif %}
+<form id="contribution-entry" method="post" action="{{ entry_action }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<input type="hidden" name="submission_key" value="{{ submission_key }}">
+{% for question in batch.questions %}
+<section class="question-responses" data-question-id="{{ question.id }}">
+<h3>Question {{ loop.index }} · {{ question.text }}</h3>
+<div class="response-rows">
+{% for row in rows if row.question_id == question.id %}
+<fieldset class="response-row"><legend>Response {{ loop.index }}</legend>
+<input type="hidden" name="row_id" value="{{ row.row_id }}">
+<input type="hidden" name="question_id_{{ row.row_id }}" value="{{ question.id }}">
+<p><label for="text_{{ row.row_id }}">Response text</label></p><textarea id="text_{{ row.row_id }}" name="text_{{ row.row_id }}" maxlength="50000" rows="6">{{ row.text }}</textarea>
+<p><label for="answer_state_{{ row.row_id }}">Answer state</label> <select id="answer_state_{{ row.row_id }}" name="answer_state_{{ row.row_id }}">{% for key, label in [('answered','Answer (blank means no answer)'),('skip','Skip — no saved answer'),('abstain','Abstain'),('not_applicable','Not applicable')] %}<option value="{{ key }}" {% if row.answer_state == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></p>
+<p><label for="attribution_{{ row.row_id }}">Attribution</label> <select id="attribution_{{ row.row_id }}" name="attribution_{{ row.row_id }}">{% for key, label in [('anonymous','Anonymous'),('alias','Alias'),('named','Named'),('group','Group')] %}<option value="{{ key }}" {% if row.attribution == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></p>
+<p><label for="display_name_{{ row.row_id }}">Name, alias, or group label</label> <input id="display_name_{{ row.row_id }}" name="display_name_{{ row.row_id }}" maxlength="200" value="{{ row.display_name }}" aria-describedby="identity_help_{{ row.row_id }}"><span id="identity_help_{{ row.row_id }}"> Required for named, alias, or group input. Anonymous input discards this field.</span></p>
+{% if invitation %}<input type="hidden" name="entry_method_{{ row.row_id }}" value="direct">{% else %}<p><label for="entry_method_{{ row.row_id }}">Entry method</label> <select id="entry_method_{{ row.row_id }}" name="entry_method_{{ row.row_id }}">{% for key, label in [('direct','Direct'),('paper','Paper transcription'),('meeting','Meeting transcription')] %}<option value="{{ key }}" {% if row.entry_method == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></p>{% endif %}
+<p><label for="publication_permission_{{ row.row_id }}">Public quotation permission</label> <select id="publication_permission_{{ row.row_id }}" name="publication_permission_{{ row.row_id }}">{% for key, label in [('none','No quotation permission'),('anonymous_quote','May quote without my name or alias'),('attributed_quote','May quote using my name, alias, or group label')] %}<option value="{{ key }}" {% if row.publication_permission == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></p>
+</fieldset>
+{% endfor %}
+</div>
+<p><button class="add-response" type="submit" name="add_question_id" value="{{ question.id }}" formnovalidate>Add another response to {{ question.source_id }}</button></p>
+</section>
+{% endfor %}
+<p id="response-add-status" role="status" aria-live="polite"></p>
+<p><button type="submit">Submit responses</button></p>
+<p>Keep this page and submission reference when retrying after a connection problem. To submit another intentional contribution, open a fresh form after receiving your receipt.</p>
+</form>
+<script src="{{ url_for('static', filename='contributions.js') }}" defer></script>

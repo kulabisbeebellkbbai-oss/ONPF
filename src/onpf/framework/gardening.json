@@ -1,0 +1,53 @@
+{
+  "key": "gardening",
+  "title": "Gardening",
+  "version": "1.0",
+  "prompts": [
+    {
+      "id": "gardening-1",
+      "stage": 3,
+      "text": "What could participants grow, and where?",
+      "answer_type": "text",
+      "document_key": "delivery",
+      "depends_on": []
+    },
+    {
+      "id": "gardening-2",
+      "stage": 3,
+      "text": "What seasonal schedule and ongoing care could work?",
+      "answer_type": "text",
+      "document_key": "session-plan",
+      "depends_on": []
+    },
+    {
+      "id": "gardening-3",
+      "stage": 4,
+      "text": "What soil, water, tools, access, and storage are needed?",
+      "answer_type": "text",
+      "document_key": "budget",
+      "depends_on": []
+    },
+    {
+      "id": "gardening-4",
+      "stage": 4,
+      "text": "Who could handle garden care when sessions are not running?",
+      "answer_type": "text",
+      "document_key": "volunteers",
+      "depends_on": []
+    }
+  ],
+  "readiness_checks": [
+    {
+      "id": "gardening-check-1",
+      "text": "Describe seasonal preparation and garden access.",
+      "document_key": "session-plan",
+      "section_key": "preparation"
+    },
+    {
+      "id": "gardening-check-2",
+      "text": "Identify responsibility for ongoing garden care.",
+      "document_key": "volunteers",
+      "section_key": "roles"
+    }
+  ]
+}

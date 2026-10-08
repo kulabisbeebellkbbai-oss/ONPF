@@ -1,0 +1,14 @@
+{% macro documents(snapshot) %}
+<h2>Exact document content</h2>
+{% for key,structure in snapshot.framework.documents.items() %}<section><h3>{{ structure.title }}</h3>
+{% for section in structure.sections %}<h4>{{ section.label }}</h4><p class="preserved">{{ snapshot.documents[key].sections[section.key] or 'No text supplied.' }}</p>{% endfor %}
+{% if 'rows' in snapshot.documents[key] %}<table><caption>Budget costs</caption><thead><tr><th>Item</th><th>Quantity</th><th>Unit cost</th><th>Status</th><th>Notes</th></tr></thead><tbody>{% for row in snapshot.documents[key].rows %}<tr><td>{{ row.item }}</td><td>{{ row.quantity }}</td><td>{{ row.unit_cost if row.unit_cost is not none else 'Unknown' }}</td><td>{{ row.cost_status }}</td><td>{{ row.notes }}</td></tr>{% endfor %}</tbody></table>{% endif %}
+</section>{% endfor %}
+<h2>Frozen selected material versions</h2>
+{% for material in snapshot.materials %}<details><summary>{{ material.title }} · version {{ material.version_number }}</summary>
+<p>Version reference: {{ material.id }}. Content hash: {{ material.content_hash }}.</p>
+<p>License: {{ material.license }}. Ownership basis: {{ material.ownership_basis.replace('_', ' ') }}.</p><p class="preserved">{{ material.permission_basis }}</p><p class="preserved">{{ material.notices }}</p>
+{% for source in material.source_terms %}<p>Source version {{ source.id }} · {{ source.title }} · {{ source.license }}</p><p class="preserved">{{ source.permission_basis }}</p><p class="preserved">{{ source.notices }}</p>{% endfor %}
+{% if material.content.kind == 'text' %}<p class="preserved">{{ material.content.text }}</p>{% else %}{% for key,document in material.content.documents.items() %}<h3>{{ document.title }}</h3>{% for section in document.sections %}<h4>{{ section.label }}</h4><p class="preserved">{{ section.text }}</p>{% endfor %}{% if document.rows is defined %}<table><thead><tr><th>Item</th><th>Quantity</th><th>Unit cost</th><th>Status</th><th>Notes</th></tr></thead><tbody>{% for row in document.rows %}<tr><td>{{ row.item }}</td><td>{{ row.quantity }}</td><td>{{ row.unit_cost if row.unit_cost is not none else 'Unknown' }}</td><td>{{ row.cost_status }}</td><td>{{ row.notes }}</td></tr>{% endfor %}</tbody></table>{% endif %}{% endfor %}{% endif %}
+</details>{% else %}<p>No shared material versions selected.</p>{% endfor %}
+{% endmacro %}

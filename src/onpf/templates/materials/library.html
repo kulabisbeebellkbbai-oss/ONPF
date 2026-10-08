@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% macro preview(content) %}
+{% if content.kind == 'text' %}<p class="preserved">{{ content.text }}</p>{% else %}{% for key,document in content.documents.items() %}<h3>{{ document.title }}</h3>{% for section in document.sections %}<h4>{{ section.label }}</h4><p class="preserved">{{ section.text }}</p>{% endfor %}{% if document.rows %}<table><caption>{{ document.title }} costs</caption><thead><tr><th>Item</th><th>Quantity</th><th>Unit cost</th><th>Status</th><th>Notes</th></tr></thead><tbody>{% for row in document.rows %}<tr><td>{{ row.item }}</td><td>{{ row.quantity }}</td><td>{{ row.unit_cost if row.unit_cost is not none else 'Unknown' }}</td><td>{{ row.cost_status }}</td><td>{{ row.notes }}</td></tr>{% endfor %}</tbody></table>{% endif %}{% endfor %}{% endif %}
+{% endmacro %}
+{% block title %}Shared materials · {{ program.title }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('programs.workspace', program_id=program.id) }}">Program workspace</a></p>
+<h1>Shared materials</h1><p>{{ program.title }}</p>
+<p>Released versions can be reused by authenticated program designers. Each program explicitly chooses its version. Later source updates leave that choice unchanged. Drafts and local adaptations remain private to their program.</p>
+{% if error %}<p class="error" role="alert">{{ error.message }}</p>{% endif %}
+<h2>This program's selected versions</h2>
+{% for adoption in adoptions %}<section>
+{% if adoption.available %}<p>{{ adoption.version.title }} — version {{ adoption.version.version_number }}. {{ adoption.version.license }}</p>{% else %}<p>Unavailable selected version. Material {{ adoption.material_id }}; version {{ adoption.version_id }}. Choose a clean replacement from the library below or remove this selection if it is no longer needed.</p>{% endif %}
+{% if is_owner %}<form action="{{ url_for('materials.remove', program_id=program.id) }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="expected_revision" value="{{ program.revision }}"><input type="hidden" name="material_id" value="{{ adoption.material_id }}"><button>Remove selection</button></form>{% endif %}
+</section>{% else %}<p>No shared versions adopted yet.</p>{% endfor %}
+<p>Replacing or removing a selection changes this draft and requires fresh owner approval. Previous releases keep their original selections.</p>
+<h2>Private material drafts</h2><p><a href="{{ url_for('materials.edit', program_id=program.id) }}">Create a material draft</a></p>
+<ul>{% for draft in drafts %}<li><a href="{{ url_for('materials.edit', program_id=program.id, material_id=draft.id) }}">{{ draft.title }}</a> — draft revision {{ draft.revision }}{% if draft.source_version_id %}, local adaptation of version {{ draft.source_version_id }}{% endif %}</li>{% else %}<li>No material drafts.</li>{% endfor %}</ul>
+<h2>Released version library</h2>
+{% for version in versions %}<section><h3>{{ version.title }} — version {{ version.version_number }}</h3>
+<p>Material reference: {{ version.material_id }}.</p>
+<p>License: {{ version.license }}. Ownership: {{ version.ownership_basis.replace('_', ' ') }}.</p><p class="preserved">Permission basis: {{ version.permission_basis }}</p><p class="preserved">{{ version.notices }}</p>{% if version.source_version_id %}<p>Source version: {{ version.source_version_id }}</p>{% endif %}
+{% for terms in version.source_terms %}<details><summary>Inherited source terms: {{ terms.title }}, version {{ terms.version_number }}</summary><p>License: {{ terms.license }}</p><p class="preserved">{{ terms.permission_basis }}</p><p class="preserved">{{ terms.notices }}</p></details>{% endfor %}
+<details><summary>Preview this released version</summary>{{ preview(version.content) }}</details>
+{% if is_owner %}<form action="{{ url_for('materials.adopt', program_id=program.id) }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="expected_revision" value="{{ program.revision }}"><input type="hidden" name="version_id" value="{{ version.id }}"><button>Adopt version {{ version.version_number }}</button></form>{% endif %}
+<form action="{{ url_for('materials.derive', program_id=program.id) }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="version_id" value="{{ version.id }}"><button>Create a private local adaptation</button></form>
+</section>{% else %}<p>No reusable versions have been released.</p>{% endfor %}
+{% if versions %}<h2>Compare released versions</h2><form action="{{ url_for('materials.compare', program_id=program.id) }}" method="get"><label for="left">Earlier version</label><select name="left" id="left">{% for version in versions %}<option value="{{ version.id }}">{{ version.title }} — {{ version.version_number }}</option>{% endfor %}</select><label for="right">Later version of the same material</label><select name="right" id="right">{% for version in versions %}<option value="{{ version.id }}">{{ version.title }} — {{ version.version_number }}</option>{% endfor %}</select><button>Preview differences</button></form>{% endif %}
+{% if is_owner %}<h2>Improvement proposals for source owners</h2><p>Only the submitted note and intentionally included content snapshot appear here. Other programs' private drafts require their own membership.</p>{% for proposal in improvements %}<article><h3>Proposal for source version {{ proposal.source_version_id }}</h3><p class="preserved">{{ proposal.note }}</p><p><a href="{{ url_for('materials.edit', program_id=proposal.derivative_program_id, material_id=proposal.derivative_id) }}">Linked derivative draft</a> (requires membership in its program), revision {{ proposal.derivative_revision }} at submission.</p>{% if proposal.proposed_content %}<details><summary>Intentionally included content at submission</summary>{{ preview(proposal.proposed_content) }}</details>{% else %}<p>No derivative content was shared.</p>{% endif %}</article>{% else %}<p>No improvement proposals.</p>{% endfor %}{% endif %}
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block title %}Manage access · ONPF{% endblock %}
+{% block content %}
+<h1>Manage accounts and project access</h1>
+<p>{% if state.is_admin %}Installation administration: you can create accounts, set project creation rights, and manage memberships across projects.{% else %}Project owner scope: you can manage memberships only for projects you own. Installation administration and project creation rights are separate.{% endif %}</p>
+{% if error %}<p class="error" role="alert">{{ error.message }}</p>{% endif %}
+{% if state.is_admin %}
+<section><h2>Create an account</h2><form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="create_user"><label for="new-username">Username</label><input id="new-username" name="username" maxlength="100" required><label for="new-password">Temporary password (at least 12 characters)</label><input id="new-password" name="password" type="password" minlength="12" required><button>Create account</button></form></section>
+{% endif %}
+<h2>Accounts</h2>
+{% for user in state.users %}
+<section><h3>{{ user.username }}{% if user.is_admin %} · installation admin{% endif %}</h3>
+<p>Can create projects: <strong>{{ 'Yes' if user.can_create_projects else 'No' }}</strong>.</p>
+{% if state.is_admin %}<form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="creation"><input type="hidden" name="user_id" value="{{ user.id }}"><label for="creation-{{ user.id }}">Can create projects</label><select id="creation-{{ user.id }}" name="allowed"><option value="yes" {{ 'selected' if user.can_create_projects else '' }}>Yes</option><option value="no" {{ 'selected' if not user.can_create_projects else '' }}>No</option></select><button>Save creation permission</button></form>{% endif %}
+<h4>Project memberships</h4>
+{% for program in state.programs %}
+<form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="membership"><input type="hidden" name="user_id" value="{{ user.id }}"><input type="hidden" name="program_id" value="{{ program.id }}"><label for="role-{{ program.id }}-{{ user.id }}">{{ program.title }}</label><select id="role-{{ program.id }}-{{ user.id }}" name="role">{% for value,label in [('', 'No access'),('viewer','View only'),('contributor','Contributor'),('facilitator','Facilitator'),('owner','Decision owner')] %}<option value="{{ value }}" {{ 'selected' if roles.get((program.id,user.id), '') == value else '' }}>{{ label }}</option>{% endfor %}</select><button>Save project access</button></form>
+{% else %}<p>No projects in your management scope.</p>{% endfor %}
+</section>
+{% endfor %}
+{% endblock %}

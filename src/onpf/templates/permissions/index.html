@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block title %}Operating permission · {{ program.title }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('programs.workspace', program_id=program.id) }}">{{ program.title }}</a></p>
+<h1>Private operating-permission evidence</h1>
+<p>A decision or draft sentence does not prove that permission was issued and filed. This evidence stays out of public exports and group-review links.</p>
+<p class="notice">Evidence status: <strong>{{ readiness.status.replace('_', ' ') }}</strong>. {% for issue in readiness.issues %}{{ issue }} {% endfor %}</p>
+{% if error %}<p class="error" role="alert">{{ error.message }}</p>{% endif %}
+<h2>Save a new permission version</h2>
+<p>Each save adds a version and keeps earlier records. Attach the issued copy before entering a filing date.</p>
+<form method="post" enctype="multipart/form-data"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<label for="issuer">Issuer or site owner</label><input id="issuer" name="issuer" maxlength="200" required value="{{ values.get('issuer', '') }}">
+<label for="effective_on">Effective date</label><input id="effective_on" name="effective_on" type="date" required value="{{ values.get('effective_on', '') }}">
+<label for="expires_on">Expiry date, if any</label><input id="expires_on" name="expires_on" type="date" value="{{ values.get('expires_on', '') }}">
+<label for="scope">Scope of permission</label><textarea id="scope" name="scope" required maxlength="5000">{{ values.get('scope', '') }}</textarea>
+<label for="conditions">Conditions and limits</label><textarea id="conditions" name="conditions" maxlength="10000">{{ values.get('conditions', '') }}</textarea>
+<label for="evidence">Private issued copy (PDF, image, ODT, DOCX or TXT; 5 MB maximum)</label><input id="evidence" name="evidence" type="file" accept=".pdf,.png,.jpg,.jpeg,.odt,.docx,.txt">
+<label for="filed_on">Date the issued copy was filed</label><input id="filed_on" name="filed_on" type="date" value="{{ values.get('filed_on', '') }}">
+<fieldset><legend>Copy distribution and posting</legend>
+{% for key,label in copy_defaults %}{% set prior = (values.get('copies', [])|selectattr('key', 'equalto', key)|list|first)|default({}) %}
+<div><label for="copy_{{ key }}_label">Recipient {{ loop.index }}</label><input id="copy_{{ key }}_label" name="copy_{{ key }}_label" value="{{ prior.get('label', label) }}" maxlength="200">
+<label for="copy_{{ key }}_state">Copy state</label><select id="copy_{{ key }}_state" name="copy_{{ key }}_state">{% for state in (['unknown','posted','not_required'] if key == 'site_posting' else ['unknown','delivered','not_required']) %}<option value="{{ state }}" {{ 'selected' if prior.get('state', 'unknown') == state else '' }}>{{ state.replace('_', ' ') }}</option>{% endfor %}</select>
+<label for="copy_{{ key }}_date">Date (for delivered or posted)</label><input id="copy_{{ key }}_date" name="copy_{{ key }}_date" type="date" value="{{ prior.get('date', '') or '' }}"></div>
+{% endfor %}</fieldset>
+<button>Save private permission version</button></form>
+<h2>Version history</h2>
+{% for record in records %}
+<article><h3>Version {{ record.version }} · {{ record.issuer }}</h3><p>Effective {{ record.effective_on }}{% if record.expires_on %} · expires {{ record.expires_on }}{% endif %}. Filed {{ record.filed_on or 'unknown' }}.</p>
+<p class="preserved">{{ record.scope }}</p><p class="preserved">{{ record.conditions }}</p>
+{% if record.replaces_id %}<p>Replaces version reference {{ record.replaces_id }}.</p>{% endif %}
+{% if record.revocation %}<p class="error">Revoked {{ record.revocation.revoked_on }}: {{ record.revocation.reason }}</p>{% endif %}
+<ul>{% for copy in record.copies %}<li>{{ copy.label }}: {{ copy.state.replace('_', ' ') }}{% if copy.date %} on {{ copy.date }}{% endif %}</li>{% endfor %}</ul>
+{% if record.evidence_name %}<p><a href="{{ url_for('permissions.download', program_id=program.id, record_id=record.id) }}">Download private evidence: {{ record.evidence_name }}</a></p>{% endif %}
+{% if is_owner and not record.revocation %}<details><summary>Record revocation</summary><form method="post" action="{{ url_for('permissions.revoke', program_id=program.id, record_id=record.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label for="revoked_on_{{ record.id }}">Revocation date</label><input id="revoked_on_{{ record.id }}" name="revoked_on" type="date" required><label for="reason_{{ record.id }}">Reason</label><textarea id="reason_{{ record.id }}" name="reason" required maxlength="2000"></textarea><button>Record revocation</button></form></details>{% endif %}
+</article>
+{% else %}<p>No permission evidence recorded.</p>{% endfor %}
+{% endblock %}

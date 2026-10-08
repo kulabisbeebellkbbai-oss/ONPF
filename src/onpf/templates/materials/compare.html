@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% from 'materials/library.html' import preview with context %}
+{% block title %}Compare material versions · {{ program.title }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('materials.library', program_id=program.id) }}">Shared material library</a></p><h1>Compare released material versions</h1><p>Adoption remains a separate owner choice.</p>
+{% for version in [comparison.left,comparison.right] %}<section><h2>{{ version.title }} — version {{ version.version_number }}</h2><p>License: {{ version.license }}</p><p class="preserved">Permission basis: {{ version.permission_basis }}</p><p class="preserved">{{ version.notices }}</p>{{ preview(version.content) }}</section>{% endfor %}
+<h2>Recorded differences</h2><pre class="preserved">{{ comparison.diff or 'The selected versions have identical content and permission terms.' }}</pre>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "releases/_documents.html" import documents %}
+{% block title %}{{ candidate.title if candidate else program.title }} · Owner approval · ONPF{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('programs.workspace', program_id=program.id) }}">Program workspace</a></p>
+{% if drafting_ready(program.id) %}<p><a href="{{ url_for('drafting.panel',program_id=program.id,kind='review') }}">Open advisory program-wide lifecycle review</a>. Select current drafts and recorded lifecycle status for all this program's candidates and releases. Compare the exact candidate hashes in the preview with the candidate below. Findings do not change candidates or record approval.</p>{% endif %}
+{% if error %}<p class="error" role="alert">{{ error.message }}</p>{% endif %}
+{% if not candidate %}
+<h1>{{ program.title }}: candidates and releases</h1>
+<p>Final design decisions belong to the designated decision owners. Consensus is optional, not an approval requirement.</p>
+<p>All current input must be reviewed, including explained deferrals. Responses arriving after preparation belong to the next cycle.</p>
+{% if lifecycle_warnings %}<div class="notice"><strong>Review draft-stage wording before freezing a release.</strong><ul>{% for warning in lifecycle_warnings %}<li>{{ warning }}</li>{% endfor %}</ul><p>Open those documents and revise the wording if it would be misleading after approval.</p></div>{% endif %}
+<p class="notice">Operating-permission evidence: <strong>{{ permission_readiness.status.replace('_', ' ') }}</strong>. <a href="{{ url_for('permissions.index', program_id=program.id) }}">Review the private evidence record</a>.</p>
+{% if clarification_rounds %}<h2>Clarification readiness</h2><ul>{% for round in clarification_rounds %}<li>Round {{ round.round_number }} · {{ round.title }} · {{ round.answered }} answered, {{ round.deferred }} deferred, {{ round.pending }} pending</li>{% endfor %}</ul><p>Pending clarification questions must be answered or explicitly deferred before preparing a candidate.</p>{% endif %}
+{% for issue in permission_readiness.issues %}<p class="error">{{ issue }}</p>{% endfor %}
+{% if is_owner %}<form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="expected_revision" value="{{ values.get('expected_revision', program.revision) }}">
+<label for="change_notes">Release change notes</label><textarea id="change_notes" name="change_notes" maxlength="5000">{{ values.get('change_notes', '') }}</textarea>
+{% if permission_review_required %}<label><input type="checkbox" name="permission_reviewed" value="yes" required {% if values.get('permission_reviewed') == 'yes' %}checked{% endif %}> I reviewed the unresolved operating-permission evidence. Preparing a design candidate does not confirm permission to operate.</label>{% endif %}
+{% if clarification_rounds|selectattr('deferred')|list %}<label><input type="checkbox" name="clarifications_reviewed" value="yes" required {% if values.get('clarifications_reviewed') == 'yes' %}checked{% endif %}> I reviewed the explained clarification deferrals and accept them in this design candidate.</label>{% endif %}
+<button>Prepare exact-content candidate</button></form>{% endif %}
+<h2>Prepared candidates</h2><ul>{% for item in candidates %}<li><a href="{{ url_for('releases.candidate', candidate_id=item.id) }}">{{ item.prepared_at }} · revision {{ item.program_revision }}</a> — {{ 'stale; fresh approval required' if item.stale else item.state }}; {{ item.pending_input_count }} responses for the next cycle</li>{% else %}<li>No candidates prepared.</li>{% endfor %}</ul>
+<h2>Immutable releases</h2><ul>{% for item in releases %}<li><a href="{{ url_for('releases.detail', release_id=item.id) }}">{{ item.title }} · release {{ item.release_number }}</a> — permission to operate: {{ item.operating_status.replace('_', ' ') }}</li>{% else %}<li>No design releases approved.</li>{% endfor %}</ul>
+{% else %}
+<h1>{{ candidate.title }}: exact-content candidate</h1>
+<p><a href="{{ url_for('releases.index', program_id=program.id) }}">All candidates and releases</a></p>
+<p class="notice">Permission to operate: <strong>{{ candidate.operating_status.replace('_', ' ') }}</strong>. Design approval does not confirm operating permission.</p>
+<p class="notice">Operating-permission evidence when prepared: <strong>{{ candidate.get('permission_evidence_status', 'not recorded').replace('_', ' ') }}</strong>. Current evidence: <strong>{{ permission_readiness.status.replace('_', ' ') }}</strong>. <a href="{{ url_for('permissions.index', program_id=program.id) }}">Review the private evidence record</a>.</p>
+{% for issue in permission_readiness.issues %}<p class="error">{{ issue }}</p>{% endfor %}
+<p>Program revision {{ candidate.program_revision }}. Framework {{ candidate.framework.version }}. Candidate hash: <code>{{ candidate.content_hash }}</code>.</p>
+{% if candidate.get('clarification_rounds') %}<h2>Frozen clarification review</h2><ul>{% for round in candidate.clarification_rounds %}<li>Round {{ round.round_number }} · {{ round.title }} · {{ round.answered }} answered, {{ round.deferred }} deferred, {{ round.pending }} pending</li>{% endfor %}</ul>{% endif %}
+<p class="preserved">{{ candidate.change_notes }}</p>
+{% if candidate.lifecycle_warnings %}<div class="notice"><strong>Draft-stage wording was present when this candidate was prepared.</strong><ul>{% for warning in candidate.lifecycle_warnings %}<li>{{ warning }}</li>{% endfor %}</ul></div>{% endif %}
+<p>{{ candidate.pending_input_count }} response{{ '' if candidate.pending_input_count == 1 else 's' }} received or corrected for the next cycle. They do not expand this frozen scope.</p>
+<p>Approval requires {{ 'all fixed owners' if candidate.approval_rule == 'all' else 'any one fixed owner' }}. Consensus is optional.</p>
+<ul>{% for owner_id in candidate.owner_ids %}<li>{{ candidate.owner_labels[owner_id] }} — {% set matches = candidate.approvals|selectattr('user_id', 'equalto', owner_id)|list %}{{ 'explicit approval recorded' if matches else 'awaiting explicit approval' }}</li>{% endfor %}</ul>
+{% if candidate.release_id %}<p><a href="{{ url_for('releases.detail', release_id=candidate.release_id) }}">Open immutable approved release</a></p>
+{% elif candidate.stale %}<p class="error">This candidate is stale. Review changed content and prepare a fresh candidate; earlier approvals cannot carry forward.</p>
+{% elif is_owner %}<form method="post" action="{{ url_for('releases.approve', candidate_id=candidate.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% if permission_review_required %}<label><input type="checkbox" name="permission_reviewed" value="yes" required> I reviewed the unresolved operating-permission evidence. This design approval does not confirm permission to operate.</label>{% endif %}<button>I approve this exact candidate</button></form>{% endif %}
+<h2>Frozen program context</h2><h3>Purpose</h3><p class="preserved">{{ candidate.purpose }}</p><h3>Local context</h3><p class="preserved">{{ candidate.local_context }}</p>
+{{ documents(candidate) }}
+<h2>Private frozen input coverage</h2><p>Inclusion in the input record does not imply adoption into the final program.</p>
+<ul>{% for row in candidate.coverage %}<li>Response {{ row.response_id }} · revision {{ row.response_revision_id }} · {{ row.status }}<p class="preserved">{{ row.reason }}</p></li>{% else %}<li>No responses were received at preparation.</li>{% endfor %}</ul>
+<h2>Private frozen decision record</h2>
+{% for decision in candidate.decisions %}<details><summary>{{ decision.outcome }}</summary><p class="preserved">{{ decision.rationale }}</p><p>Decision reference: {{ decision.id }}{% if decision.supersedes_id %}; supersedes {{ decision.supersedes_id }}{% endif %}.</p><ul>{% for item in decision.get('proposal_snapshots', []) %}<li>{{ item.title }} · revision {{ item.proposal_revision }}<p class="preserved">{{ item.text }}</p></li>{% endfor %}{% for source in decision.response_links %}<li>Response {{ source.response_id }} · revision {{ source.response_revision_id }}</li>{% endfor %}</ul></details>{% else %}<p>No separate owner decisions recorded.</p>{% endfor %}
+{% endif %}
+{% endblock %}

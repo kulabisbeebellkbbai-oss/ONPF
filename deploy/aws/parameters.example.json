@@ -1,0 +1,30 @@
+[
+  {
+    "ParameterKey": "UbuntuImageId",
+    "ParameterValue": "ami-00000000000000000"
+  },
+  {
+    "ParameterKey": "PublicHost",
+    "ParameterValue": "onpf.example.org"
+  },
+  {
+    "ParameterKey": "InstanceType",
+    "ParameterValue": "t3.small"
+  },
+  {
+    "ParameterKey": "DataVolumeSizeGiB",
+    "ParameterValue": "20"
+  },
+  {
+    "ParameterKey": "BackupRetentionDays",
+    "ParameterValue": "30"
+  },
+  {
+    "ParameterKey": "AlarmEmail",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "AgencyTag",
+    "ParameterValue": "your-agency"
+  }
+]

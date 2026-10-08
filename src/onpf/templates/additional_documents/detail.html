@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block title %}{{ item.title }} · {{ program.title }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('additional_documents.index', program_id=program.id) }}">Additional documents</a> · <a href="{{ url_for('programs.workspace', program_id=program.id) }}">{{ program.title }}</a></p>
+<h1>{{ item.title }}</h1><p>{{ structure.title }} · {{ 'offered for owner publication review' if item.include_in_public else 'private' }}</p>
+<p><a href="{{ url_for('additional_documents.download', program_id=program.id, document_id=item.id, extension='html') }}">Print view</a> · <a href="{{ url_for('additional_documents.download', program_id=program.id, document_id=item.id, extension='odt') }}">Editable ODT</a> · <a href="{{ url_for('additional_documents.download', program_id=program.id, document_id=item.id, extension='md') }}">Markdown</a>{% if item.upload_name %} · <a href="{{ url_for('additional_documents.attachment', program_id=program.id, document_id=item.id) }}">Attached {{ item.upload_name }}</a>{% endif %}</p>
+{% if can_edit %}<h2>Edit document</h2>{% if error %}<p class="error" role="alert">{{ error.message }}</p>{% endif %}
+{% set template_key = item.template_key %}{% set templates = {item.template_key: structure} %}{% include 'additional_documents/_form.html' %}{% endif %}
+<h2>Current text</h2>{% for section in structure.sections %}<h3>{{ section.label }}</h3><p class="preserved">{{ item.sections[section.key] or 'Not yet drafted' }}</p>{% endfor %}
+{% endblock %}

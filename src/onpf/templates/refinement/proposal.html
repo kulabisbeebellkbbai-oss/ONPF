@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Proposal · {{ program.title }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('refinement.board', program_id=program.id) }}">Refinement</a></p>
+<h1>{{ 'Edit proposal' if proposal_id else 'Add proposal' }}</h1>
+<p>A response can support multiple proposals. Saving selected responses records their incorporation and retains the source revisions; review the overall disposition separately when it needs a more nuanced explanation.</p>
+{% if error %}<p class="error" role="alert">{{ error.message }}</p>{% endif %}
+<form method="post" action="{{ url_for('refinement.proposal',program_id=program.id,proposal_id=proposal_id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="ai_receipt" value="{{ ai_receipt or '' }}"><input type="hidden" name="expected_revision" value="{{ expected_revision }}">{% if proposal_id %}<input type="hidden" name="draft_record_key" value="{{ proposal_id }}">{% endif %}
+<label for="title">Title</label><input id="title" name="title" value="{{ values.title }}" maxlength="200" required>
+<label for="theme">Theme (optional, manual grouping)</label><input id="theme" name="theme" value="{{ values.theme }}" maxlength="200">
+<label for="text">Proposed design text</label><textarea id="text" name="text" required rows="6">{{ values.text }}</textarea>
+<label for="proposal-response-filter">Find source responses</label><input id="proposal-response-filter" class="response-filter" data-target="proposal-responses" type="search" autocomplete="off">
+<fieldset id="proposal-responses"><legend>Source responses</legend>
+{% for response in responses %}<div class="response-choice" data-search="{{ (response.reference ~ ' ' ~ response.question_text ~ ' ' ~ response.text)|lower }}"><label><input type="checkbox" name="response_ids" value="{{ response.id }}" {{ 'checked' if response.id in values.response_ids else '' }}> <strong>{{ response.reference }}</strong> · {{ response.question_text[:100] }}</label><details><summary>Read full response and question</summary><p>{{ response.question_text }}</p><p class="preserved">{{ response.text or response.answer_state }}</p><a href="{{ url_for('refinement.coverage', program_id=program.id) }}#response-{{ response.id }}">History and disposition</a></details></div>{% else %}<p>No responses yet. Proposals can also originate from local planning.</p>{% endfor %}
+</fieldset>
+<p class="workflow-actions">{% if drafting_ready(program.id) %}<button name="draft_kind" value="proposal" formaction="{{ url_for('drafting.panel',program_id=program.id) }}" formnovalidate>Review drafting assistance with current wording</button>{% endif %}
+<button type="submit">Save proposal</button></p></form>
+<script defer src="{{ url_for('static', filename='refinement.js') }}"></script>
+{% if proposal_id %}{% set origin_target={'kind':'proposal','record_key':proposal_id} %}{% include 'drafting/_origins.html' %}{% endif %}
+{% endblock %}

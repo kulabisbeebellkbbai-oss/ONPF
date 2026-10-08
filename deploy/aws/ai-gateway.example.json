@@ -1,0 +1,12 @@
+{
+  "gateway_version": "1.103.2",
+  "bind_host": "127.0.0.1",
+  "port": 4000,
+  "runtime_root": "/opt/onpf-ai-gateway",
+  "config_root": "/etc/onpf-ai-gateway",
+  "python": "/usr/bin/python3.12",
+  "master_key_file": "/etc/onpf-ai-gateway-keys/master-key",
+  "provider_key_file": "/etc/onpf-ai-gateway-keys/provider-key",
+  "model_id": "openai/gpt-4o-mini-2024-07-18",
+  "lock_sha256": "f3d826960321bb80c08df75feaaf1f819de2468e583cb60402628d7868c52703"
+}

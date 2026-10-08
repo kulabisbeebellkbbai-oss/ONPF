@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Program settings' if editing else 'Create a program' }} · ONPF{% endblock %}
+{% block content %}
+<h1>{{ 'Program settings' if editing else 'Create a program' }}</h1>
+{% if not editing %}<p><a href="{{ url_for('exports.import_page') }}">Import a public program package as a new draft</a></p>{% endif %}
+<p>Design approval and permission to operate are separate. New documents start as empty drafts.</p>
+{% if error %}<p class="error" role="alert">{{ error.message }}</p>{% endif %}
+<form method="post" class="stack">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+{% if editing %}<input type="hidden" name="expected_revision" value="{{ expected_revision }}">{% endif %}
+<label for="title">Working title</label><input id="title" name="title" value="{{ values.get('title', '') }}" required maxlength="200">
+<label for="purpose">Purpose</label><textarea id="purpose" name="purpose">{{ values.get('purpose', '') }}</textarea>
+<label for="local_context">Local context</label><textarea id="local_context" name="local_context">{{ values.get('local_context', '') }}</textarea>
+<label for="operating_status">Permission to operate</label><select id="operating_status" name="operating_status">{% for value,label in [('pending','Pending'),('confirmed','Confirmed'),('not_applicable','Not applicable')] %}<option value="{{ value }}" {{ 'selected' if values.operating_status == value else '' }}>{{ label }}</option>{% endfor %}</select>
+<label for="approval_rule">Who must approve a design?</label><select id="approval_rule" name="approval_rule"><option value="all" {{ 'selected' if values.approval_rule == 'all' else '' }}>All listed decision owners</option><option value="any" {{ 'selected' if values.approval_rule == 'any' else '' }}>Any one listed decision owner</option></select>
+<fieldset><legend>Optional activity modules</legend><p>The core inquiry is included in every program.</p>{% for key,module in framework.modules.items() if key != 'core' %}<label><input type="checkbox" name="module_keys" value="{{ key }}" {{ 'checked' if key in values.module_keys else '' }}> {{ module.title }}</label><br>{% endfor %}</fieldset>
+{% if editing %}<fieldset><legend>Accounts and access</legend><p>Keep at least one decision owner. Facilitators can prepare drafts. Viewers can read the workspace and documents. Contributors do not receive access to these drafts.</p><input type="hidden" name="membership_editor" value="1">{% for account in accounts %}<label for="role_{{ account.id }}">{{ account.username }}</label><select id="role_{{ account.id }}" name="role_{{ account.id }}">{% for role,label in [('', 'No access'),('owner','Decision owner'),('facilitator','Facilitator'),('viewer','Viewer'),('contributor','Contributor')] %}<option value="{{ role }}" {{ 'selected' if member_roles.get(account.id, '') == role else '' }}>{{ label }}</option>{% endfor %}</select><br>{% endfor %}</fieldset>{% else %}<p>You will be this program's first decision owner. Add other accounts from program settings after creation.</p>{% endif %}
+<button type="submit">{{ 'Save settings' if editing else 'Create program' }}</button>
+</form>
+{% if not editing %}<hr><h2>Set up the two initial working programs</h2><p>Create “Bridge creative and growing program” and “Volunteer-led guided art program” as independent, empty drafts. Both have pending permission to operate. This does not record endorsement or approval.</p><form method="post" action="{{ url_for('programs.setup_working_programs') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit">Create both working programs</button></form>{% endif %}
+{% endblock %}

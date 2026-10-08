@@ -1,0 +1,1181 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "ONPF single Ubuntu server preparation: private retained encrypted data and backups, HTTPS ingress, Session Manager administration. No application installation or storage initialization.",
+  "Metadata": {
+    "ONPF::OperatorNotes": {
+      "RegionSelection": "This pilot uses the operator-reported existing region us-east-2 (US East Ohio). Pass --region us-east-2 to deployment commands and verify the Region output. CloudFormation remains portable and resolves resources in the actual stack region.",
+      "OfficialUbuntuImageParameter": "/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id",
+      "ImagePinning": "Resolve the official parameter in the selected region, verify Canonical owner 099720109477 and Ubuntu 24.04 amd64, then supply the resulting AMI ID. Updates keep that pinned ID unless deliberately changed.",
+      "Installation": "CloudFormation completion does not mean ONPF is installed. Check cloud-init result and Session Manager access, then explicitly install a reviewed checksum-verified bundle.",
+      "VolumeIdentification": "The attachment Device is a requested mapping only. The installer must identify the device by the DataVolumeId and EBS/NVMe serial (removing the serial hyphen), reject ambiguity, and never guess an NVMe name. No disk is formatted or mounted here.",
+      "Replacement": "Before any update/delete affecting Instance, DataVolume, DataVolumeAttachment, subnet or AZ: confirm a completed off-host backup, stop application and backup jobs, unmount cleanly, review the change set, and follow manual reattachment/recovery. Retain preserves bytes but does not block detach, retain attachments, automatically reattach, or prevent creation of an empty replacement volume.",
+      "RetainedCharges": "DataVolume, BackupBucket and ArtifactBucket are retained on deletion/replacement and keep billing until an administrator explicitly disposes of them. Root filesystem, server, network and Elastic IP are deleted normally.",
+      "BackupRetention": "Lifecycle expiration is asynchronous. Current backups expire after BackupRetentionDays; superseded versions expire that many days after becoming noncurrent. Overwritten keys can persist for roughly twice the selected days; use unique timestamped keys. Expired delete markers and incomplete multipart uploads are cleaned separately.",
+      "RoleBoundary": "The instance role is available to instance processes; IMDSv2 is not isolation between Unix users. Runtime can write backups but cannot read or delete historical backup objects. Administrative recovery uses a separate operator identity.",
+      "Monitoring": "Task3 publishes operational metrics every five minutes in ONPF/Operations with only StackName dimension. BackupSuccess=1 is published only after confirmed verified S3 upload; the monitor publishes BackupAgeHours from that completed-upload timestamp and a clearly stale value when no upload has succeeded. No URL, tokens, submissions, access logs or application logs are sent to CloudWatch.",
+      "AlarmContact": "AlarmEmail is optional. Supplying a contact during deployment sends a confirmation invitation; the recipient must confirm it. No notifications reach unconfirmed email subscriptions."
+    }
+  },
+  "Parameters": {
+    "UbuntuImageId": {
+      "Type": "AWS::EC2::Image::Id",
+      "Description": "Required pinned official Canonical Ubuntu Server 24.04 LTS amd64 gp3 AMI ID for the chosen region. Resolve and verify before deploying; never use a moving image reference on updates."
+    },
+    "PublicHost": {
+      "Type": "String",
+      "Description": "Operator-selected canonical lowercase public hostname; registering the domain and DNS configuration are separate steps.",
+      "MinLength": 4,
+      "MaxLength": 253,
+      "AllowedPattern": "(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?"
+    },
+    "InstanceType": {
+      "Type": "String",
+      "Default": "t3.small",
+      "AllowedValues": [
+        "t3.small",
+        "t3.medium",
+        "t3.large",
+        "t3a.small",
+        "t3a.medium",
+        "t3a.large"
+      ],
+      "Description": "Compatible x86 burstable instance; standard credit mode limits sustained CPU instead of billing surplus credits. Sizing is unmeasured."
+    },
+    "DataVolumeSizeGiB": {
+      "Type": "Number",
+      "Default": 20,
+      "MinValue": 8,
+      "MaxValue": 1024,
+      "Description": "Encrypted private gp3 data volume capacity; shrinking/replacement is a manual recovery operation."
+    },
+    "BackupRetentionDays": {
+      "Type": "Number",
+      "Default": 30,
+      "MinValue": 1,
+      "MaxValue": 3650,
+      "Description": "Current-version expiration days and noncurrent-version expiration days; set the data retention policy before collecting real data."
+    },
+    "AlarmEmail": {
+      "Type": "String",
+      "Default": "",
+      "AllowedPattern": "^$|^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\\.[A-Za-z]{2,63}$",
+      "MaxLength": 254,
+      "Description": "Optional operator-selected alarm email; recipient confirmation is required. Leave empty to subscribe manually later."
+    },
+    "AgencyTag": {
+      "Type": "String",
+      "Default": "onpf",
+      "MinLength": 1,
+      "MaxLength": 64,
+      "AllowedPattern": "[A-Za-z0-9][A-Za-z0-9_. -]{0,63}",
+      "Description": "Nonsecret agency label for resource tags. Do not use participant information."
+    }
+  },
+  "Conditions": {
+    "HasAlarmEmail": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "AlarmEmail"
+            },
+            ""
+          ]
+        }
+      ]
+    }
+  },
+  "Resources": {
+    "Vpc": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.42.0.0/16",
+        "EnableDnsHostnames": true,
+        "EnableDnsSupport": true,
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-vpc"
+            }
+          },
+          {
+            "Key": "Application",
+            "Value": "ONPF"
+          },
+          {
+            "Key": "Stack",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          },
+          {
+            "Key": "Agency",
+            "Value": {
+              "Ref": "AgencyTag"
+            }
+          }
+        ]
+      }
+    },
+    "PublicSubnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "CidrBlock": "10.42.1.0/24",
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": ""
+            }
+          ]
+        },
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-public"
+            }
+          },
+          {
+            "Key": "Application",
+            "Value": "ONPF"
+          },
+          {
+            "Key": "Stack",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          },
+          {
+            "Key": "Agency",
+            "Value": {
+              "Ref": "AgencyTag"
+            }
+          }
+        ]
+      }
+    },
+    "InternetGateway": {
+      "Type": "AWS::EC2::InternetGateway",
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-internet"
+            }
+          },
+          {
+            "Key": "Application",
+            "Value": "ONPF"
+          },
+          {
+            "Key": "Stack",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          },
+          {
+            "Key": "Agency",
+            "Value": {
+              "Ref": "AgencyTag"
+            }
+          }
+        ]
+      }
+    },
+    "GatewayAttachment": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "InternetGatewayId": {
+          "Ref": "InternetGateway"
+        }
+      }
+    },
+    "RouteTable": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-routes"
+            }
+          },
+          {
+            "Key": "Application",
+            "Value": "ONPF"
+          },
+          {
+            "Key": "Stack",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          },
+          {
+            "Key": "Agency",
+            "Value": {
+              "Ref": "AgencyTag"
+            }
+          }
+        ]
+      }
+    },
+    "InternetRoute": {
+      "Type": "AWS::EC2::Route",
+      "DependsOn": "GatewayAttachment",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "RouteTable"
+        },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "InternetGateway"
+        }
+      }
+    },
+    "SubnetRoute": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "PublicSubnet"
+        },
+        "RouteTableId": {
+          "Ref": "RouteTable"
+        }
+      }
+    },
+    "WebSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Public HTTP certificate challenge/redirect and HTTPS only; Session Manager needs no inbound administrative port.",
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 80,
+            "ToPort": 80,
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Certificate challenge and HTTPS redirect"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 443,
+            "ToPort": 443,
+            "CidrIp": "0.0.0.0/0",
+            "Description": "HTTPS application"
+          }
+        ],
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Package updates, DNS, certificate renewal and AWS HTTPS APIs"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-web"
+            }
+          },
+          {
+            "Key": "Application",
+            "Value": "ONPF"
+          },
+          {
+            "Key": "Stack",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          },
+          {
+            "Key": "Agency",
+            "Value": {
+              "Ref": "AgencyTag"
+            }
+          }
+        ]
+      }
+    },
+    "ArtifactBucket": {
+      "Type": "AWS::S3::Bucket",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-artifacts"
+            }
+          },
+          {
+            "Key": "Application",
+            "Value": "ONPF"
+          },
+          {
+            "Key": "Stack",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          },
+          {
+            "Key": "Agency",
+            "Value": {
+              "Ref": "AgencyTag"
+            }
+          }
+        ]
+      }
+    },
+    "ArtifactBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "ArtifactBucket"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "RequireTLS",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ArtifactBucket",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Sub": "${ArtifactBucket.Arn}/*"
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "BackupBucket": {
+      "Type": "AWS::S3::Bucket",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-backups"
+            }
+          },
+          {
+            "Key": "Application",
+            "Value": "ONPF"
+          },
+          {
+            "Key": "Stack",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          },
+          {
+            "Key": "Agency",
+            "Value": {
+              "Ref": "AgencyTag"
+            }
+          }
+        ],
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "ExpireBackups",
+              "Status": "Enabled",
+              "Prefix": "backups/",
+              "ExpirationInDays": {
+                "Ref": "BackupRetentionDays"
+              },
+              "NoncurrentVersionExpiration": {
+                "NoncurrentDays": {
+                  "Ref": "BackupRetentionDays"
+                }
+              },
+              "AbortIncompleteMultipartUpload": {
+                "DaysAfterInitiation": 1
+              }
+            },
+            {
+              "Id": "RemoveExpiredDeleteMarkers",
+              "Status": "Enabled",
+              "Prefix": "backups/",
+              "ExpiredObjectDeleteMarker": true
+            }
+          ]
+        }
+      }
+    },
+    "BackupBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "BackupBucket"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "RequireTLS",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "BackupBucket",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Sub": "${BackupBucket.Arn}/*"
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "InstanceRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
+          }
+        ],
+        "Policies": [
+          {
+            "PolicyName": "ScopedOnpfOperations",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "${ArtifactBucket.Arn}/releases/*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:PutObject"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "${BackupBucket.Arn}/backups/*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudwatch:PutMetricData"
+                  ],
+                  "Resource": [
+                    "*"
+                  ],
+                  "Condition": {
+                    "StringEquals": {
+                      "cloudwatch:namespace": "ONPF/Operations"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-role"
+            }
+          },
+          {
+            "Key": "Application",
+            "Value": "ONPF"
+          },
+          {
+            "Key": "Stack",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          },
+          {
+            "Key": "Agency",
+            "Value": {
+              "Ref": "AgencyTag"
+            }
+          }
+        ]
+      }
+    },
+    "InstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "InstanceRole"
+          }
+        ]
+      }
+    },
+    "Instance": {
+      "Type": "AWS::EC2::Instance",
+      "DependsOn": [
+        "InternetRoute",
+        "SubnetRoute"
+      ],
+      "Properties": {
+        "ImageId": {
+          "Ref": "UbuntuImageId"
+        },
+        "InstanceType": {
+          "Ref": "InstanceType"
+        },
+        "SubnetId": {
+          "Ref": "PublicSubnet"
+        },
+        "SecurityGroupIds": [
+          {
+            "Ref": "WebSecurityGroup"
+          }
+        ],
+        "IamInstanceProfile": {
+          "Ref": "InstanceProfile"
+        },
+        "CreditSpecification": {
+          "CPUCredits": "standard"
+        },
+        "MetadataOptions": {
+          "HttpEndpoint": "enabled",
+          "HttpTokens": "required",
+          "HttpPutResponseHopLimit": 1
+        },
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/sda1",
+            "Ebs": {
+              "Encrypted": true,
+              "VolumeSize": 16,
+              "VolumeType": "gp3",
+              "DeleteOnTermination": true
+            }
+          }
+        ],
+        "PropagateTagsToVolumeOnCreation": true,
+        "UserData": {
+          "Fn::Base64": "#!/bin/bash\nset -euo pipefail\nexport DEBIAN_FRONTEND=noninteractive\napt-get -o Acquire::Retries=10 update\napt-get -o Acquire::Retries=10 install -y python3 python3-venv python3-pip nginx certbot python3-certbot-nginx e2fsprogs nvme-cli util-linux ca-certificates curl unzip gnupg groff less\nsystemctl disable --now nginx\nrm -f /etc/nginx/sites-enabled/default\n# Official Ubuntu AWS images include the Amazon SSM Agent snap.\n# Fail setup explicitly if it is absent; do not download an unverified replacement.\nsnap list amazon-ssm-agent >/dev/null\nsystemctl enable --now snap.amazon-ssm-agent.amazon-ssm-agent.service\n# BEGIN authenticated native AWS CLI\n# Pinned vendor x86_64 distribution; update only after review and unit acceptance.\n# Key source: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html\n# Fingerprint: FB5DB77FD5C118B80511ADA8A6310ACC4672475C\numask 022\ncli_stage=$(mktemp -d)\ntrap 'rm -rf -- \"$cli_stage\"' EXIT\nexport GNUPGHOME=\"$cli_stage/gnupg\"\nmkdir -m 0700 \"$GNUPGHOME\"\ncd \"$cli_stage\"\ncat > aws-cli-public-key.asc <<'AWS_CLI_KEY'\n-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nmQINBF2Cr7UBEADJZHcgusOJl7ENSyumXh85z0TRV0xJorM2B/JL0kHOyigQluUG\nZMLhENaG0bYatdrKP+3H91lvK050pXwnO/R7fB/FSTouki4ciIx5OuLlnJZIxSzx\nPqGl0mkxImLNbGWoi6Lto0LYxqHN2iQtzlwTVmq9733zd3XfcXrZ3+LblHAgEt5G\nTfNxEKJ8soPLyWmwDH6HWCnjZ/aIQRBTIQ05uVeEoYxSh6wOai7ss/KveoSNBbYz\ngbdzoqI2Y8cgH2nbfgp3DSasaLZEdCSsIsK1u05CinE7k2qZ7KgKAUIcT/cR/grk\nC6VwsnDU0OUCideXcQ8WeHutqvgZH1JgKDbznoIzeQHJD238GEu+eKhRHcz8/jeG\n94zkcgJOz3KbZGYMiTh277Fvj9zzvZsbMBCedV1BTg3TqgvdX4bdkhf5cH+7NtWO\nlrFj6UwAsGukBTAOxC0l/dnSmZhJ7Z1KmEWilro/gOrjtOxqRQutlIqG22TaqoPG\nfYVN+en3Zwbt97kcgZDwqbuykNt64oZWc4XKCa3mprEGC3IbJTBFqglXmZ7l9ywG\nEEUJYOlb2XrSuPWml39beWdKM8kzr1OjnlOm6+lpTRCBfo0wa9F8YZRhHPAkwKkX\nXDeOGpWRj4ohOx0d2GWkyV5xyN14p2tQOCdOODmz80yUTgRpPVQUtOEhXQARAQAB\ntCFBV1MgQ0xJIFRlYW0gPGF3cy1jbGlAYW1hem9uLmNvbT6JAlQEEwEIAD4CGwMF\nCwkIBwIGFQoJCAsCBBYCAwECHgECF4AWIQT7Xbd/1cEYuAURraimMQrMRnJHXAUC\nakV0ygUJDqP4lQAKCRCmMQrMRnJHXFHjD/9eyZLYcKuQOlLvtqSDtUBiEZf6ZZjM\ni3ygYH8rJNtuToUH+HvSpe819urJCquXhDrlK6N+aqW0hCLtNABJG/vsafIgvIYJ\nhSGgpgtNnQyMV1jViRWqPjbouw8OkYKBThUfT1i2Y+wn58ifs6ODBCmTexWtXspA\nSi+Gt49xDOW0APmbOPnI+a4HJW6tVEo6MWS0WjzpiBayR3d1A4pt4YrPfSdDgpLo\nh2SLQqlRqvvVZJaWBjhkErNFpfsBA06sDcPEOb0G8LBUbR4WOcdvhe5LubJbZuxC\nAG9kNPCVeQP1ixwjgjXKysaxeQ6rv0VzIQgRp6tLVLWhy6AKDNvLjFSsmXZ1Wl08\nY/RlOHXlzLuQMRE6sR1wOdRxc9TsrNWTGiBK65cvSWOy03JeBkQQ8pesqltiyxI9\nU21kkgiXtTSKNGfKK8pO27D81YANhRqPK7iTp6kuFiY2WtOg90KTMNlIT+Ff85Y2\nb1rHj6Z0SrCkJujhWk3IBPic/wJgz01LEc/OAdUPlby90RJZcIBhSlWhT7mXnXIO\nc0HWlNQrns2s3CTyYwZSiSlYe9ApeLwhjDo8NhbFuCAy61l6O5UsR4AfZxx/rGKv\n2wFb1/RN/P4gNe6vmxZAPjR0AQcwD3tc2McimOLr/22kmPz8IH3I0X7WoSFr0Biz\nE91G7bb0hOb/cA==\n=knv7\n-----END PGP PUBLIC KEY BLOCK-----\nAWS_CLI_KEY\ngpg --batch --import aws-cli-public-key.asc\ntest \"$(gpg --batch --with-colons --fingerprint | awk -F: '$1 == \"fpr\" {print $10}')\" = FB5DB77FD5C118B80511ADA8A6310ACC4672475C\ncurl --fail --show-error --silent --location --proto '=https' --tlsv1.2 --retry 5 https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.37.4.zip -o awscliv2.zip\ncurl --fail --show-error --silent --location --proto '=https' --tlsv1.2 --retry 5 https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.37.4.zip.sig -o awscliv2.zip.sig\ngpg --batch --verify awscliv2.zip.sig awscliv2.zip\nunzip -q awscliv2.zip\n./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli\n/usr/local/bin/aws --version | grep '^aws-cli/2.37.4 '\n# END authenticated native AWS CLI\n# Explicit reviewed installation is performed later through Session Manager.\n"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-server"
+            }
+          },
+          {
+            "Key": "Application",
+            "Value": "ONPF"
+          },
+          {
+            "Key": "Stack",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          },
+          {
+            "Key": "Agency",
+            "Value": {
+              "Ref": "AgencyTag"
+            }
+          }
+        ]
+      }
+    },
+    "DataVolume": {
+      "Type": "AWS::EC2::Volume",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::GetAtt": [
+            "PublicSubnet",
+            "AvailabilityZone"
+          ]
+        },
+        "Encrypted": true,
+        "VolumeType": "gp3",
+        "Size": {
+          "Ref": "DataVolumeSizeGiB"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-data"
+            }
+          },
+          {
+            "Key": "Application",
+            "Value": "ONPF"
+          },
+          {
+            "Key": "Stack",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          },
+          {
+            "Key": "Agency",
+            "Value": {
+              "Ref": "AgencyTag"
+            }
+          }
+        ]
+      }
+    },
+    "DataVolumeAttachment": {
+      "Type": "AWS::EC2::VolumeAttachment",
+      "Properties": {
+        "Device": "/dev/sdf",
+        "InstanceId": {
+          "Ref": "Instance"
+        },
+        "VolumeId": {
+          "Ref": "DataVolume"
+        }
+      }
+    },
+    "ElasticIp": {
+      "Type": "AWS::EC2::EIP",
+      "DependsOn": "GatewayAttachment",
+      "Properties": {
+        "Domain": "vpc",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-address"
+            }
+          },
+          {
+            "Key": "Application",
+            "Value": "ONPF"
+          },
+          {
+            "Key": "Stack",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          },
+          {
+            "Key": "Agency",
+            "Value": {
+              "Ref": "AgencyTag"
+            }
+          }
+        ]
+      }
+    },
+    "ElasticIpAssociation": {
+      "Type": "AWS::EC2::EIPAssociation",
+      "Properties": {
+        "AllocationId": {
+          "Fn::GetAtt": [
+            "ElasticIp",
+            "AllocationId"
+          ]
+        },
+        "InstanceId": {
+          "Ref": "Instance"
+        }
+      }
+    },
+    "AlarmTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-alarms"
+            }
+          },
+          {
+            "Key": "Application",
+            "Value": "ONPF"
+          },
+          {
+            "Key": "Stack",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          },
+          {
+            "Key": "Agency",
+            "Value": {
+              "Ref": "AgencyTag"
+            }
+          }
+        ]
+      }
+    },
+    "AlarmSubscription": {
+      "Type": "AWS::SNS::Subscription",
+      "Condition": "HasAlarmEmail",
+      "Properties": {
+        "Protocol": "email",
+        "Endpoint": {
+          "Ref": "AlarmEmail"
+        },
+        "TopicArn": {
+          "Ref": "AlarmTopic"
+        }
+      }
+    },
+    "AlarmTopicPolicy": {
+      "Type": "AWS::SNS::TopicPolicy",
+      "Properties": {
+        "Topics": [{"Ref": "AlarmTopic"}],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [{
+            "Effect": "Allow",
+            "Principal": {"Service": "cloudwatch.amazonaws.com"},
+            "Action": "sns:Publish",
+            "Resource": {"Ref": "AlarmTopic"},
+            "Condition": {
+              "StringEquals": {"aws:SourceAccount": {"Ref": "AWS::AccountId"}},
+              "ArnLike": {"aws:SourceArn": {"Fn::Sub": "arn:${AWS::Partition}:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:*"}}
+            }
+          }]
+        }
+      }
+    },
+    "InstanceStatusAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "EC2 instance or underlying system status check failed. Manual recovery required.",
+        "Namespace": "AWS/EC2",
+        "MetricName": "StatusCheckFailed",
+        "Dimensions": [
+          {
+            "Name": "InstanceId",
+            "Value": {
+              "Ref": "Instance"
+            }
+          }
+        ],
+        "Statistic": "Maximum",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "Threshold": 1,
+        "Period": 300,
+        "EvaluationPeriods": 2,
+        "DatapointsToAlarm": 2,
+        "TreatMissingData": "breaching",
+        "AlarmActions": [
+          {
+            "Ref": "AlarmTopic"
+          }
+        ],
+        "OKActions": [
+          {
+            "Ref": "AlarmTopic"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-instance-status"
+            }
+          },
+          {
+            "Key": "Application",
+            "Value": "ONPF"
+          },
+          {
+            "Key": "Stack",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          },
+          {
+            "Key": "Agency",
+            "Value": {
+              "Ref": "AgencyTag"
+            }
+          }
+        ]
+      }
+    },
+    "ApplicationHealthAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "Local application health checks are failing or absent. No request contents are collected.",
+        "Namespace": "ONPF/Operations",
+        "MetricName": "ApplicationHealthy",
+        "Dimensions": [
+          {
+            "Name": "StackName",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          }
+        ],
+        "ComparisonOperator": "LessThanThreshold",
+        "Threshold": 1,
+        "Statistic": "Minimum",
+        "Unit": "Count",
+        "Period": 300,
+        "EvaluationPeriods": 3,
+        "DatapointsToAlarm": 3,
+        "TreatMissingData": "breaching",
+        "AlarmActions": [
+          {
+            "Ref": "AlarmTopic"
+          }
+        ],
+        "OKActions": [
+          {
+            "Ref": "AlarmTopic"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-ApplicationHealthy"
+            }
+          },
+          {
+            "Key": "Application",
+            "Value": "ONPF"
+          },
+          {
+            "Key": "Stack",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          },
+          {
+            "Key": "Agency",
+            "Value": {
+              "Ref": "AgencyTag"
+            }
+          }
+        ]
+      }
+    },
+    "DataDiskAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "Private data filesystem usage is at least 85 percent, or monitor is missing.",
+        "Namespace": "ONPF/Operations",
+        "MetricName": "DataDiskUsedPercent",
+        "Dimensions": [
+          {
+            "Name": "StackName",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          }
+        ],
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "Threshold": 85,
+        "Statistic": "Maximum",
+        "Unit": "Percent",
+        "Period": 300,
+        "EvaluationPeriods": 3,
+        "DatapointsToAlarm": 3,
+        "TreatMissingData": "breaching",
+        "AlarmActions": [
+          {
+            "Ref": "AlarmTopic"
+          }
+        ],
+        "OKActions": [
+          {
+            "Ref": "AlarmTopic"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-DataDiskUsedPercent"
+            }
+          },
+          {
+            "Key": "Application",
+            "Value": "ONPF"
+          },
+          {
+            "Key": "Stack",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          },
+          {
+            "Key": "Agency",
+            "Value": {
+              "Ref": "AgencyTag"
+            }
+          }
+        ]
+      }
+    },
+    "BackupAgeAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "Last confirmed off-host backup is over 30 hours old, or monitor is missing. Recovery remains manual.",
+        "Namespace": "ONPF/Operations",
+        "MetricName": "BackupAgeHours",
+        "Dimensions": [
+          {
+            "Name": "StackName",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          }
+        ],
+        "ComparisonOperator": "GreaterThanThreshold",
+        "Threshold": 30,
+        "Statistic": "Maximum",
+        "Unit": "None",
+        "Period": 300,
+        "EvaluationPeriods": 3,
+        "DatapointsToAlarm": 3,
+        "TreatMissingData": "breaching",
+        "AlarmActions": [
+          {
+            "Ref": "AlarmTopic"
+          }
+        ],
+        "OKActions": [
+          {
+            "Ref": "AlarmTopic"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-BackupAgeHours"
+            }
+          },
+          {
+            "Key": "Application",
+            "Value": "ONPF"
+          },
+          {
+            "Key": "Stack",
+            "Value": {
+              "Ref": "AWS::StackName"
+            }
+          },
+          {
+            "Key": "Agency",
+            "Value": {
+              "Ref": "AgencyTag"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "InstanceId": {
+      "Description": "Session Manager target instance.",
+      "Value": {
+        "Ref": "Instance"
+      }
+    },
+    "ElasticIp": {
+      "Description": "Stable public IPv4; configure the hostname A record separately.",
+      "Value": {
+        "Ref": "ElasticIp"
+      }
+    },
+    "DataVolumeId": {
+      "Description": "Retained data identity; installer must positively identify the attached disk using this ID.",
+      "Value": {
+        "Ref": "DataVolume"
+      }
+    },
+    "DataAvailabilityZone": {
+      "Description": "Retained volume and server AZ; EBS cannot attach across AZs.",
+      "Value": {
+        "Fn::GetAtt": [
+          "PublicSubnet",
+          "AvailabilityZone"
+        ]
+      }
+    },
+    "ArtifactBucketName": {
+      "Description": "Private retained release bundle bucket.",
+      "Value": {
+        "Ref": "ArtifactBucket"
+      }
+    },
+    "ArtifactPrefix": {
+      "Description": "Exact instance-readable object prefix.",
+      "Value": "releases/"
+    },
+    "BackupBucketName": {
+      "Description": "Private retained write-only runtime backup bucket.",
+      "Value": {
+        "Ref": "BackupBucket"
+      }
+    },
+    "BackupPrefix": {
+      "Description": "Exact runtime-writable immutable timestamped backup prefix.",
+      "Value": "backups/"
+    },
+    "AlarmTopicArn": {
+      "Description": "Subscribe administrative alarm recipients and confirm email subscriptions.",
+      "Value": {
+        "Ref": "AlarmTopic"
+      }
+    },
+    "UbuntuImageId": {
+      "Description": "Pinned image ID used for this server.",
+      "Value": {
+        "Ref": "UbuntuImageId"
+      }
+    },
+    "PublicHost": {
+      "Description": "Configured canonical public hostname.",
+      "Value": {
+        "Ref": "PublicHost"
+      }
+    },
+    "ApplicationUrl": {
+      "Description": "Expected HTTPS origin after explicit installation, DNS and certificate acceptance.",
+      "Value": {
+        "Fn::Sub": "https://${PublicHost}"
+      }
+    },
+    "Region": {
+      "Description": "Actual stack region; retain this value for installation, backups, monitoring and recovery.",
+      "Value": {
+        "Ref": "AWS::Region"
+      }
+    },
+    "MetricNamespace": {
+      "Description": "Exact namespace for nonpersonal operational metrics.",
+      "Value": "ONPF/Operations"
+    },
+    "MetricStackName": {
+      "Description": "Exact sole custom metric dimension: StackName.",
+      "Value": {
+        "Ref": "AWS::StackName"
+      }
+    }
+  }
+}

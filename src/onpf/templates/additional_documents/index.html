@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block title %}Additional documents · {{ program.title }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('programs.workspace', program_id=program.id) }}">{{ program.title }}</a></p>
+<h1>Supporting materials</h1>
+<p>Maintain project documents and reusable templates for cards, posters, letters, signs, surveys, menus and other materials. Completed operational records belong in your external systems.</p>
+<ul>{% for item in items %}<li><a href="{{ url_for('additional_documents.detail', program_id=program.id, document_id=item.id) }}">{{ item.title }}</a> · {{ templates[item.template_key].title }} · {{ 'offered for owner publication review' if item.include_in_public else 'private' }}{% if item.upload_name %} · attachment{% endif %}</li>{% else %}<li>No additional documents yet.</li>{% endfor %}</ul>
+{% if can_edit %}
+<p><a class="button" href="{{ url_for('additional_documents.create_supporting',program_id=program.id) }}">Create supporting material or reusable template</a></p>
+{% if error %}<p class="error" role="alert">{{ error.message }}</p>{% endif %}
+{% endif %}
+{% endblock %}

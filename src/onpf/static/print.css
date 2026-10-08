@@ -1,0 +1,12 @@
+@page { size: Letter; margin: .65in; }
+.printed-question { break-inside: avoid; margin: 1rem 0 2rem; }
+.question-code { font-size: .8rem; }
+.writing-space { height: 2.2in; border: 1px solid #777; background: repeating-linear-gradient(to bottom, transparent 0, transparent .32in, #bbb .33in); }
+@media print {
+  .questionnaire-cover { break-after: page; }
+  .page-content > .printed-question { break-after: page; margin: 0; padding: 0; }
+  .printed-question:last-child { break-after: auto; }
+  .writing-space { height: 5.7in; background: none; }
+  main { padding: 0; }
+  h2 { font-size: 16pt; }
+}

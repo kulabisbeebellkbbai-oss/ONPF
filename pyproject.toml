@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools==84.0.0", "wheel==0.48.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "onpf"
+version = "0.3.0"
+description = "A self-hosted community-program design workspace"
+requires-python = ">=3.11"
+license = "MIT-0"
+dependencies = ["Flask>=3.1,<4", "Flask-WTF>=1.2,<2", "waitress>=3,<4", "odfpy>=1.4,<2", "Pillow>=11,<14", "reportlab>=4,<6"]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<10"]
+
+[project.scripts]
+onpf = "onpf.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+onpf = ["templates/**/*.html", "templates/*.html", "static/*", "migrations/*.sql", "framework/*.json", "framework/**/*.md", "examples/*.json"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
